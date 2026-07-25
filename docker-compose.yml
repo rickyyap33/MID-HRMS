@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  database:
+    image: postgres:16
+    container_name: mid-hrms-db
+    environment:
+      POSTGRES_USER: midadmin
+      POSTGRES_PASSWORD: midpassword
+      POSTGRES_DB: midhrms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  
