@@ -232,3 +232,24 @@
 - Final checks passed:
 	- `node --check server.js` passed.
 	- frontend `npm run build` passed.
+
+## 20. Latest Phase Save State (2026-07-26)
+- PHASE 6A-M2C FULL SALARY WORKFLOW AUDIT PASS.
+- Audit date: 2026-07-26.
+- Lifecycle tested end-to-end: create draft, read history, edit draft, cancel draft, create new draft, approve/publish, historical resolution, future-dated resolution, concurrency protection, authentication/authorization, cleanup, and invariant restoration.
+- Concurrency/race results: approve-vs-cancel, double-approve, and edit-vs-approve races all resolved with exactly one winner and one `409` loser.
+- Atomicity result: rollback test passed; a simulated publish failure restored the previous published row exactly and left the draft unchanged.
+- DB invariant result: pre/post signatures for `employees`, `employee_salary_history`, `employment_details`, and `company_payroll_profile` matched after cleanup.
+- Employee 3 permanent invariant: unchanged at RM6000.00 / MONTHLY / MYR with `effective_from=2026-07-26`, `effective_to=NULL`, `record_status=PUBLISHED`, `source_type=LEGACY_MIGRATION`.
+- Current salary workflow endpoint inventory:
+	- `GET /employees/:id/employment`
+	- `GET /employees/:id/salary-history`
+	- `POST /employees/:id/salary-history/drafts`
+	- `PUT /employees/:employeeId/salary-history/drafts/:draftId`
+	- `POST /employees/:employeeId/salary-history/drafts/:draftId/cancel`
+	- `POST /employees/:employeeId/salary-history/drafts/:draftId/approve`
+- Remaining risks:
+	- Salary Management UI is not started yet.
+	- Salary-specific authorization hardening and UI flows still need dedicated work.
+	- Legacy compatibility data remains present and must not be repurposed as payroll truth.
+- Next approved phase: Salary Management UI Design Review.
