@@ -210,6 +210,25 @@ const isStrictPositiveNumericValue = (value) => {
 };
 
 
+const isValidTimestampToken = (value) => {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return false;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(trimmed)) {
+    return false;
+  }
+
+  const parsed = new Date(trimmed);
+  return !Number.isNaN(parsed.getTime());
+};
+
+
 const resolveEmployeeSalary = async (employeeId, targetDate) => {
   const result = await pool.query(
     `SELECT
@@ -1016,6 +1035,272 @@ app.post("/employees/:id/salary-history/drafts", authenticateToken, requireRoles
     if(error.code === "23503" && error.constraint === "employee_salary_history_employee_id_fkey"){
       return res.status(404).json({
         message:"Employee not found"
+      });
+    }
+
+    console.log(error);
+
+    return res.status(500).json({
+      message:"Server error"
+    });
+
+  } finally {
+    client.release();
+  }
+});
+
+
+// Update Salary Draft (Admin only)
+app.put("/employees/:employeeId/salary-history/drafts/:draftId", authenticateToken, requireRoles("Admin"), async(req,res)=>{
+
+  const { employeeId, draftId } = req.params;
+
+  if(!/^[1-9][0-9]*$/.test(employeeId)){
+    return res.status(400).json({
+      message:"Invalid employee id"
+    });
+  }
+
+  if(!/^[1-9][0-9]*$/.test(draftId)){
+    return res.status(400).json({
+      message:"Invalid draft id"
+    });
+  }
+
+  if(req.body === null || typeof req.body !== "object" || Array.isArray(req.body)){
+    return res.status(400).json({
+      message:"Invalid request body"
+    });
+  }
+
+  const protectedFields = new Set([
+    "id",
+    "employee_id",
+    "record_status",
+    "effective_to",
+    "source_type",
+    "source_reference",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "approved_by_user_id",
+    "approved_at",
+    "cancelled_by_user_id",
+    "cancelled_at",
+    "role",
+    "user_id"
+  ]);
+
+  const allowedFields = new Set([
+    "salary_amount",
+    "salary_basis",
+    "currency_code",
+    "effective_from",
+    "reason",
+    "expected_updated_at"
+  ]);
+
+  const bodyKeys = Object.keys(req.body);
+  const protectedField = bodyKeys.find((key) => protectedFields.has(key));
+
+  if(protectedField){
+    return res.status(400).json({
+      message:`Protected field: ${protectedField}`
+    });
+  }
+
+  const unexpectedField = bodyKeys.find((key) => !allowedFields.has(key));
+
+  if(unexpectedField){
+    return res.status(400).json({
+      message:`Unexpected field: ${unexpectedField}`
+    });
+  }
+
+  const {
+    salary_amount,
+    salary_basis,
+    currency_code,
+    effective_from,
+    reason,
+    expected_updated_at
+  } = req.body;
+
+  if(salary_amount === undefined || !isStrictPositiveNumericValue(salary_amount)){
+    return res.status(400).json({
+      message:"Invalid salary_amount"
+    });
+  }
+
+  if(typeof salary_basis !== "string" || !["MONTHLY", "WEEKLY", "DAILY", "HOURLY"].includes(salary_basis.trim())){
+    return res.status(400).json({
+      message:"Invalid salary_basis"
+    });
+  }
+
+  if(typeof currency_code !== "string" || !/^[A-Z]{3}$/.test(currency_code.trim())){
+    return res.status(400).json({
+      message:"Invalid currency_code"
+    });
+  }
+
+  if(!isValidDateOnlyValue(effective_from)){
+    return res.status(400).json({
+      message:"Invalid effective_from"
+    });
+  }
+
+  if(typeof reason !== "string" || reason.trim() === ""){
+    return res.status(400).json({
+      message:"Invalid reason"
+    });
+  }
+
+  if(expected_updated_at === undefined || !isValidTimestampToken(expected_updated_at)){
+    return res.status(400).json({
+      message:"Invalid expected_updated_at"
+    });
+  }
+
+  const parsedEmployeeId = Number(employeeId);
+  const parsedDraftId = Number(draftId);
+  const normalizedSalaryAmount = typeof salary_amount === "string" ? salary_amount.trim() : salary_amount;
+  const normalizedSalaryBasis = salary_basis.trim();
+  const normalizedCurrencyCode = currency_code.trim();
+  const normalizedEffectiveFrom = effective_from.trim();
+  const normalizedReason = reason.trim();
+  const normalizedExpectedUpdatedAt = expected_updated_at.trim();
+
+  const client = await pool.connect();
+  let transactionActive = false;
+
+  try {
+
+    await client.query("BEGIN");
+    transactionActive = true;
+
+    const draftResult = await client.query(
+      `SELECT id,
+              employee_id,
+              record_status,
+              updated_at,
+              to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US') AS updated_at_signature
+       FROM employee_salary_history
+       WHERE id=$1
+         AND employee_id=$2`,
+      [parsedDraftId, parsedEmployeeId]
+    );
+
+    if(draftResult.rows.length === 0){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(404).json({
+        message:"Salary draft not found"
+      });
+    }
+
+    const existingDraft = draftResult.rows[0];
+
+    if(existingDraft.record_status !== "DRAFT"){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(409).json({
+        message:"Salary draft is no longer editable"
+      });
+    }
+
+    const expectedUpdatedAtDate = new Date(normalizedExpectedUpdatedAt);
+    const currentUpdatedAtDate = existingDraft.updated_at instanceof Date
+      ? existingDraft.updated_at
+      : new Date(existingDraft.updated_at);
+
+    if(expectedUpdatedAtDate.getTime() !== currentUpdatedAtDate.getTime()){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(409).json({
+        message:"Salary draft was updated by another session"
+      });
+    }
+
+    const updateResult = await client.query(
+      `UPDATE employee_salary_history
+       SET salary_amount=$1,
+           salary_basis=$2,
+           currency_code=$3,
+           effective_from=$4,
+           reason=$5,
+           updated_at=CURRENT_TIMESTAMP
+       WHERE id=$6
+         AND employee_id=$7
+         AND record_status='DRAFT'
+         AND to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US') = $8
+       RETURNING id,
+                 employee_id,
+                 salary_amount,
+                 salary_basis,
+                 currency_code,
+                 effective_from,
+                 effective_to,
+                 record_status,
+                 reason,
+                 source_type,
+                 source_reference,
+                 created_by_user_id,
+                 created_at,
+                 updated_at,
+                 approved_by_user_id,
+                 approved_at,
+                 cancelled_by_user_id,
+                 cancelled_at`,
+      [
+        normalizedSalaryAmount,
+        normalizedSalaryBasis,
+        normalizedCurrencyCode,
+        normalizedEffectiveFrom,
+        normalizedReason,
+        parsedDraftId,
+        parsedEmployeeId,
+        existingDraft.updated_at_signature
+      ]
+    );
+
+    if(updateResult.rows.length === 0){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(409).json({
+        message:"Salary draft was updated by another session"
+      });
+    }
+
+    await client.query("COMMIT");
+    transactionActive = false;
+
+    const updatedDraft = updateResult.rows[0];
+
+    return res.status(200).json({
+      message:"Salary draft updated",
+      draft:{
+        ...updatedDraft,
+        effective_from: formatDateOnly(updatedDraft.effective_from),
+        effective_to: formatDateOnly(updatedDraft.effective_to)
+      }
+    });
+
+  } catch(error){
+
+    if(transactionActive){
+      try {
+        await client.query("ROLLBACK");
+      } catch (_) {}
+    }
+
+    if(error.code === "23514"){
+      return res.status(400).json({
+        message:"Invalid salary draft payload"
       });
     }
 
