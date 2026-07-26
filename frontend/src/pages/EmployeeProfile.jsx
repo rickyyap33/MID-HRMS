@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../services/api";
+import SalaryManagementSection from "../components/SalaryManagementSection";
 
 export default function EmployeeProfile() {
   const { id } = useParams();
@@ -45,6 +46,9 @@ export default function EmployeeProfile() {
   const [documentErrorMessage, setDocumentErrorMessage] = useState("");
   const [documentUploadKey, setDocumentUploadKey] = useState(0);
   const [openDocumentMenuId, setOpenDocumentMenuId] = useState(null);
+  const [salaryHistory, setSalaryHistory] = useState([]);
+  const [salaryHistoryLoading, setSalaryHistoryLoading] = useState(true);
+  const [salaryHistoryError, setSalaryHistoryError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -124,11 +128,6 @@ export default function EmployeeProfile() {
   );
 
   useEffect(() => {
-    loadData(true);
-    loadDocuments(true);
-  }, [loadData]);
-
-  useEffect(() => {
     const handleDocumentMenuOutsideClick = (event) => {
       if (!(event.target instanceof Element)) {
         return;
@@ -167,6 +166,44 @@ export default function EmployeeProfile() {
     },
     [id]
   );
+
+  const loadSalaryHistory = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setSalaryHistoryLoading(true);
+      }
+
+      setSalaryHistoryError("");
+
+      try {
+        const response = await api.get(`/employees/${id}/salary-history`);
+        const rows = Array.isArray(response.data?.salary_history) ? response.data.salary_history : [];
+        setSalaryHistory(rows);
+      } catch (err) {
+        if (err.response?.status === 403) {
+          setSalaryHistoryError("You do not have permission to view salary information.");
+        } else {
+          setSalaryHistoryError("Failed to load salary information.");
+        }
+        setSalaryHistory([]);
+      } finally {
+        if (showLoading) {
+          setSalaryHistoryLoading(false);
+        }
+      }
+    },
+    [id]
+  );
+
+  const refreshSalaryData = useCallback(async () => {
+    await Promise.all([loadData(false), loadSalaryHistory(false)]);
+  }, [loadData, loadSalaryHistory]);
+
+  useEffect(() => {
+    loadData(true);
+    loadDocuments(true);
+    loadSalaryHistory(true);
+  }, [loadData, loadDocuments, loadSalaryHistory]);
 
   const handleDocumentSubmit = async (event) => {
     event.preventDefault();
@@ -233,74 +270,6 @@ export default function EmployeeProfile() {
     if (typeof value !== "string") return value;
     const trimmed = value.trim();
     return trimmed === "" ? null : trimmed;
-  };
-
-  const formatSalaryAmount = (salaryAmount, currencyCode) => {
-    if (salaryAmount === null || salaryAmount === undefined || salaryAmount === "") {
-      return null;
-    }
-
-    const numericAmount = Number(salaryAmount);
-    if (!Number.isFinite(numericAmount)) {
-      return null;
-    }
-
-    const normalizedCurrency = typeof currencyCode === "string" ? currencyCode.toUpperCase() : "";
-    const locale = normalizedCurrency === "MYR" ? "en-MY" : "en";
-
-    try {
-      if (normalizedCurrency) {
-        return new Intl.NumberFormat(locale, {
-          style: "currency",
-          currency: normalizedCurrency,
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        }).format(numericAmount);
-      }
-    } catch (error) {
-      // Fall through to plain decimal formatting.
-    }
-
-    return new Intl.NumberFormat(locale, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(numericAmount);
-  };
-
-  const formatSalaryBasis = (salaryBasis) => {
-    if (typeof salaryBasis !== "string") {
-      return "";
-    }
-
-    const normalizedBasis = salaryBasis.toUpperCase();
-
-    if (normalizedBasis === "MONTHLY") return " / Month";
-    if (normalizedBasis === "WEEKLY") return " / Week";
-    if (normalizedBasis === "DAILY") return " / Day";
-    if (normalizedBasis === "HOURLY") return " / Hour";
-
-    return "";
-  };
-
-  const formatDateDisplay = (isoDate) => {
-    if (typeof isoDate !== "string" || isoDate.trim() === "") {
-      return "-";
-    }
-
-    const normalizedDate = isoDate.slice(0, 10);
-    const [year, month, day] = normalizedDate.split("-").map((part) => Number(part));
-
-    if (!year || !month || !day) {
-      return normalizedDate;
-    }
-
-    const utcDate = new Date(Date.UTC(year, month - 1, day));
-
-    return new Intl.DateTimeFormat("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric"
-    }).format(utcDate);
   };
 
   const formatDocumentDisplayName = (fileName) => {
@@ -672,23 +641,6 @@ export default function EmployeeProfile() {
                 <strong>{employment.manager_id || "-"}</strong>
               </div>
               <div className="profile-field">
-                <span>Current Salary</span>
-                <strong>
-                  {employment.salary_configured &&
-                  formatSalaryAmount(employment.salary_amount, employment.salary_currency_code)
-                    ? `${formatSalaryAmount(employment.salary_amount, employment.salary_currency_code)}${formatSalaryBasis(employment.salary_basis)}`
-                    : "Salary not configured"}
-                </strong>
-              </div>
-              <div className="profile-field">
-                <span>Effective From</span>
-                <strong>
-                  {employment.salary_configured
-                    ? formatDateDisplay(employment.salary_effective_from)
-                    : "-"}
-                </strong>
-              </div>
-              <div className="profile-field">
                 <span>Status</span>
                 <strong>{employment.employment_status || "-"}</strong>
               </div>
@@ -716,6 +668,17 @@ export default function EmployeeProfile() {
                 Cancel
               </button>
             </div>
+          )}
+
+          {!isEditingEmployment && employment && (
+            <SalaryManagementSection
+              employeeId={id}
+              employment={employment}
+              salaryHistory={salaryHistory}
+              salaryHistoryLoading={salaryHistoryLoading}
+              salaryHistoryError={salaryHistoryError}
+              onRefresh={refreshSalaryData}
+            />
           )}
         </section>
 

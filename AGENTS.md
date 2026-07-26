@@ -253,3 +253,43 @@
 	- Salary-specific authorization hardening and UI flows still need dedicated work.
 	- Legacy compatibility data remains present and must not be repurposed as payroll truth.
 - Next approved phase: Salary Management UI Design Review.
+
+## 21. Latest Phase Save State (2026-07-27)
+- PHASE 6A-M2C SALARY MANAGEMENT UI-2 PASS.
+- Added create-only salary draft UI workflow in frontend:
+	- `frontend/src/components/SalaryDraftModal.jsx`
+	- `frontend/src/components/SalaryManagementSection.jsx`
+	- `frontend/src/pages/EmployeeProfile.jsx`
+	- `frontend/src/App.css`
+- UI-2 behavior confirmed:
+	- Change Salary / Set Initial Salary action opens create modal.
+	- Client validation for amount, basis, currency, effective date, and reason.
+	- Create request sends only allowed fields (`salary_amount`, `salary_basis`, `currency_code`, `effective_from`, `reason`).
+	- No direct salary mutation in UI; official current salary remains employment-endpoint driven.
+	- Active draft creation is blocked in UI and still enforced by backend `409`.
+	- Success path closes modal and refreshes both employment and salary history from backend source of truth.
+- Real protected HTTP integration validation passed (validation recovery):
+	- Explicit env-based DB connection succeeded using `Pool({ host, port, database, user, password })` from `.env`.
+	- Admin identity resolved from live DB (`users.role='Admin'`) and JWT generated from local `JWT_SECRET`.
+	- Real `POST /employees/:id/salary-history/drafts` returned `201` for temporary employee id `72`.
+	- Persisted draft row verified in DB:
+		- `salary_amount=6500.00`
+		- `salary_basis=MONTHLY`
+		- `currency_code=MYR`
+		- `effective_from=2026-08-01`
+		- `record_status=DRAFT`
+		- `created_by_user_id=1`
+	- Verified no `PUBLISHED` row created for the temporary employee.
+- Current salary isolation and invariants passed:
+	- Employee 3 remained unchanged at `RM6000.00 / MONTHLY / MYR` with `effective_from=2026-07-26`.
+	- Employee 3 salary history signature unchanged.
+	- `employment_details.salary_amount` for Employee 3 unchanged.
+	- `company_payroll_profile.payroll_enabled` unchanged (`false`).
+- Guaranteed cleanup passed:
+	- Cleanup order executed by temporary employee id: salary history rows -> employment details -> employee profile -> employee.
+	- Post-cleanup verification: temporary employee count `0`, temporary salary history count `0`.
+	- No temporary validation harness file remained.
+- Final checks passed:
+	- `node --check server.js` passed.
+	- `frontend npm run build` passed.
+- Next phase: UI-3 Edit Draft.
