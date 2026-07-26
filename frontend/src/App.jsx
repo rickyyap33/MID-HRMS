@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Menu } from "lucide-react";
 
 import Sidebar from "./components/Sidebar";
 
@@ -13,16 +15,44 @@ import "./App.css";
 
 
 function Layout(){
+  const location = useLocation();
+  const isLoginRoute = location.pathname === "/login";
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
 
-    <div className="layout">
+    <div className={`layout ${isLoginRoute ? "layout-login" : ""}`}>
 
-      <Sidebar />
+      {!isLoginRoute ? (
+        <>
+          <Sidebar
+            isMobileOpen={isMobileSidebarOpen}
+            onNavigate={() => setIsMobileSidebarOpen(false)}
+          />
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            aria-label="Open navigation"
+            onClick={() => setIsMobileSidebarOpen(true)}
+          >
+            <Menu size={18} />
+            Menu
+          </button>
+          <div
+            className={`sidebar-overlay ${isMobileSidebarOpen ? "sidebar-overlay-open" : ""}`}
+            role="presentation"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        </>
+      ) : null}
 
-      <main className="content">
+      <main className={`content ${isLoginRoute ? "content-login" : ""}`}>
 
-        <div className="page-shell">
+        <div className={`page-shell ${isLoginRoute ? "page-shell-login" : ""}`}>
 
           <Routes>
 

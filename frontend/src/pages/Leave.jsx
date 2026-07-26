@@ -433,7 +433,7 @@ export default function Leave(){
     <div className="employees-page">
       <div className="employees-header">
         <div>
-          <h1 className="leave-page-title">Leave Management</h1>
+          <h1 className="page-title leave-page-title">Leave Management</h1>
           <p className="employees-subtitle">Manage leave balances and requests</p>
         </div>
       </div>

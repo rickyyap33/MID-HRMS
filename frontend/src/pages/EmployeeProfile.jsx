@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../services/api";
 import SalaryManagementSection from "../components/SalaryManagementSection";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function EmployeeProfile() {
   const { id } = useParams();
@@ -46,6 +47,7 @@ export default function EmployeeProfile() {
   const [documentErrorMessage, setDocumentErrorMessage] = useState("");
   const [documentUploadKey, setDocumentUploadKey] = useState(0);
   const [openDocumentMenuId, setOpenDocumentMenuId] = useState(null);
+  const [pendingDeleteDocument, setPendingDeleteDocument] = useState(null);
   const [salaryHistory, setSalaryHistory] = useState([]);
   const [salaryHistoryLoading, setSalaryHistoryLoading] = useState(true);
   const [salaryHistoryError, setSalaryHistoryError] = useState("");
@@ -235,9 +237,23 @@ export default function EmployeeProfile() {
     }
   };
 
-  const handleDeleteDocument = async (documentId) => {
-    const confirmed = window.confirm("Delete this document?");
-    if (!confirmed) return;
+  const handleDeleteDocument = (document) => {
+    setPendingDeleteDocument(document);
+  };
+
+  const closeDeleteDocumentModal = () => {
+    if (deletingDocumentId !== null) {
+      return;
+    }
+
+    setPendingDeleteDocument(null);
+  };
+
+  const confirmDeleteDocument = async () => {
+    const documentId = pendingDeleteDocument?.id;
+    if (!documentId) {
+      return;
+    }
 
     setDeletingDocumentId(documentId);
     setDocumentErrorMessage("");
@@ -246,6 +262,7 @@ export default function EmployeeProfile() {
     try {
       await api.delete(`/documents/${documentId}`);
       await loadDocuments(false);
+      setPendingDeleteDocument(null);
       setDocumentSuccessMessage("Document deleted successfully.");
     } catch (err) {
       setDocumentErrorMessage(err.response?.data?.message || "Failed to delete document.");
@@ -318,19 +335,25 @@ export default function EmployeeProfile() {
     setSavingProfile(true);
     setProfileUpdateError("");
 
+    const payload = {
+      phone: normalizeValue(profileForm.phone),
+      address: normalizeValue(profileForm.address),
+      date_of_birth: normalizeValue(profileForm.date_of_birth),
+      emergency_contact_name: normalizeValue(profileForm.emergency_contact_name),
+      emergency_contact_phone: normalizeValue(profileForm.emergency_contact_phone)
+    };
+
     try {
-      await api.put(`/employees/${id}/profile`, {
-        phone: normalizeValue(profileForm.phone),
-        address: normalizeValue(profileForm.address),
-        date_of_birth: normalizeValue(profileForm.date_of_birth),
-        emergency_contact_name: normalizeValue(profileForm.emergency_contact_name),
-        emergency_contact_phone: normalizeValue(profileForm.emergency_contact_phone)
-      });
+      if (profile) {
+        await api.put(`/employees/${id}/profile`, payload);
+      } else {
+        await api.post(`/employees/${id}/profile`, payload);
+      }
 
       await loadData(false);
       setIsEditingProfile(false);
     } catch (err) {
-      setProfileUpdateError(err.response?.data?.message || "Failed to update profile.");
+      setProfileUpdateError(err.response?.data?.message || "Failed to save profile.");
     } finally {
       setSavingProfile(false);
     }
@@ -340,18 +363,24 @@ export default function EmployeeProfile() {
     setSavingEmployment(true);
     setEmploymentUpdateError("");
 
+    const payload = {
+      join_date: normalizeValue(employmentForm.join_date),
+      employment_type: normalizeValue(employmentForm.employment_type),
+      manager_id: normalizeValue(employmentForm.manager_id),
+      employment_status: normalizeValue(employmentForm.employment_status)
+    };
+
     try {
-      await api.put(`/employees/${id}/employment`, {
-        join_date: normalizeValue(employmentForm.join_date),
-        employment_type: normalizeValue(employmentForm.employment_type),
-        manager_id: normalizeValue(employmentForm.manager_id),
-        employment_status: normalizeValue(employmentForm.employment_status)
-      });
+      if (employment) {
+        await api.put(`/employees/${id}/employment`, payload);
+      } else {
+        await api.post(`/employees/${id}/employment`, payload);
+      }
 
       await loadData(false);
       setIsEditingEmployment(false);
     } catch (err) {
-      setEmploymentUpdateError(err.response?.data?.message || "Failed to update employment details.");
+      setEmploymentUpdateError(err.response?.data?.message || "Failed to save employment details.");
     } finally {
       setSavingEmployment(false);
     }
@@ -364,7 +393,7 @@ export default function EmployeeProfile() {
   if (loading) {
     return (
       <div className="profile-page">
-        <h1>Employee Profile</h1>
+        <h1 className="page-title">Employee Profile</h1>
         <p className="profile-muted">Loading profile information...</p>
       </div>
     );
@@ -374,7 +403,7 @@ export default function EmployeeProfile() {
     return (
       <div className="profile-page">
         <div className="profile-topbar">
-          <h1>Employee Profile</h1>
+          <h1 className="page-title">Employee Profile</h1>
           <Link className="btn-secondary profile-back-btn" to="/employees">
             Back to Employees
           </Link>
@@ -390,7 +419,7 @@ export default function EmployeeProfile() {
     <div className="profile-page">
       <div className="profile-topbar">
         <div>
-          <h1>Employee Profile</h1>
+          <h1 className="page-title">Employee Profile</h1>
           <p className="employees-subtitle">Employee ID: {id}</p>
         </div>
 
@@ -431,9 +460,9 @@ export default function EmployeeProfile() {
                 setProfileUpdateError("");
                 setIsEditingProfile(true);
               }}
-              disabled={!profile || savingProfile}
+              disabled={savingProfile}
             >
-              Edit Profile
+              {profile ? "Edit Profile" : "Add Personal Information"}
             </button>
           </div>
 
@@ -530,7 +559,7 @@ export default function EmployeeProfile() {
               </div>
             </div>
           ) : (
-            <p className="profile-muted">No personal profile information found.</p>
+            <p className="profile-muted">No personal information yet.</p>
           )}
 
           {profileUpdateError && <p className="profile-error profile-inline-error">{profileUpdateError}</p>}
@@ -564,9 +593,9 @@ export default function EmployeeProfile() {
                 setEmploymentUpdateError("");
                 setIsEditingEmployment(true);
               }}
-              disabled={!employment || savingEmployment}
+              disabled={savingEmployment}
             >
-              Edit Employment
+              {employment ? "Edit Employment" : "Add Employment Information"}
             </button>
           </div>
 
@@ -646,7 +675,7 @@ export default function EmployeeProfile() {
               </div>
             </div>
           ) : (
-            <p className="profile-muted">No employment details found.</p>
+            <p className="profile-muted">No employment information yet.</p>
           )}
 
           {employmentUpdateError && <p className="profile-error profile-inline-error">{employmentUpdateError}</p>}
@@ -825,7 +854,7 @@ export default function EmployeeProfile() {
                                 className="document-menu-item document-menu-item-danger"
                                 onClick={() => {
                                   setOpenDocumentMenuId(null);
-                                  handleDeleteDocument(document.id);
+                                  handleDeleteDocument(document);
                                 }}
                                 disabled={deletingDocumentId === document.id}
                               >
@@ -849,6 +878,22 @@ export default function EmployeeProfile() {
           <p className="profile-muted">Profile and employment records are not created yet for this employee.</p>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteDocument)}
+        title="Delete Document?"
+        message={`This will permanently delete ${
+          pendingDeleteDocument?.file_name
+            ? formatDocumentDisplayName(pendingDeleteDocument.file_name)
+            : "the selected file"
+        }.`}
+        confirmLabel="Delete Document"
+        cancelLabel="Cancel"
+        isSubmitting={deletingDocumentId !== null}
+        onCancel={closeDeleteDocumentModal}
+        onConfirm={confirmDeleteDocument}
+        variant="danger"
+      />
     </div>
   );
 }

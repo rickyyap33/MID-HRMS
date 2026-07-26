@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function Employees() {
 	const [employees, setEmployees] = useState([]);
@@ -19,6 +20,9 @@ export default function Employees() {
 	const [editingEmployeeId, setEditingEmployeeId] = useState(null);
 	const [modalError, setModalError] = useState("");
 	const [modalSubmitting, setModalSubmitting] = useState(false);
+	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+	const [pendingDeleteEmployee, setPendingDeleteEmployee] = useState(null);
+	const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
 	const fetchEmployees = useCallback(async (showLoading = true) => {
 		if (showLoading) {
@@ -176,10 +180,27 @@ export default function Employees() {
 	};
 
 	const handleDeleteEmployee = (employeeId) => {
-		const confirmed = window.confirm("Delete this employee?");
-		if (!confirmed) return;
+		const target = employees.find((emp) => emp.id === employeeId);
+		if (!target) return;
 
-		setEmployees((prev) => prev.filter((emp) => emp.id !== employeeId));
+		setPendingDeleteEmployee({ id: target.id, name: target.name || "this employee" });
+		setDeleteModalOpen(true);
+	};
+
+	const closeDeleteModal = () => {
+		if (deleteSubmitting) return;
+		setDeleteModalOpen(false);
+		setPendingDeleteEmployee(null);
+	};
+
+	const confirmDeleteEmployee = async () => {
+		if (!pendingDeleteEmployee) return;
+
+		setDeleteSubmitting(true);
+		setEmployees((prev) => prev.filter((emp) => emp.id !== pendingDeleteEmployee.id));
+		setDeleteModalOpen(false);
+		setPendingDeleteEmployee(null);
+		setDeleteSubmitting(false);
 	};
 
 	const filteredEmployees = useMemo(() => {
@@ -214,7 +235,7 @@ export default function Employees() {
 		<div className="employees-page">
 			<div className="employees-header">
 				<div>
-					<h1>Employees</h1>
+					<h1 className="page-title">Employees</h1>
 					<p className="employees-subtitle">Manage your team directory</p>
 				</div>
 
@@ -431,6 +452,18 @@ export default function Employees() {
 					</div>
 				</div>
 			) : null}
+
+			<ConfirmModal
+				isOpen={deleteModalOpen}
+				title="Delete Employee?"
+				message={`This will remove ${pendingDeleteEmployee?.name || "this employee"} from the current list view.`}
+				confirmLabel="Delete Employee"
+				cancelLabel="Cancel"
+				isSubmitting={deleteSubmitting}
+				onCancel={closeDeleteModal}
+				onConfirm={confirmDeleteEmployee}
+				variant="danger"
+			/>
 		</div>
 	);
 }

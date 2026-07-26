@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import ConfirmModal from "../components/ConfirmModal";
 
 export default function Attendance(){
   const initialFormData = {
@@ -19,6 +20,7 @@ export default function Attendance(){
   const [submitting, setSubmitting] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState(null);
   const [formData, setFormData] = useState(initialFormData);
+  const [pendingDeleteRecord, setPendingDeleteRecord] = useState(null);
 
   const fetchAttendance = async () => {
     try {
@@ -186,23 +188,29 @@ export default function Attendance(){
   };
 
   const handleDelete = (record) => {
-    const confirmed = window.confirm(
-      `Delete attendance record #${record.id}?`
-    );
+    setPendingDeleteRecord(record);
+  };
 
-    if (!confirmed) return;
+  const closeDeleteModal = () => {
+    if (submitting) return;
+    setPendingDeleteRecord(null);
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDeleteRecord) return;
 
     setSubmitting(true);
     setError("");
     setSuccessMessage("");
 
-    api.delete(`/attendance/${record.id}`)
+    api.delete(`/attendance/${pendingDeleteRecord.id}`)
       .then(async () => {
-        if (editingRecordId === record.id) {
+        if (editingRecordId === pendingDeleteRecord.id) {
           resetForm();
         }
 
         setSuccessMessage("Attendance record deleted successfully");
+        setPendingDeleteRecord(null);
         setLoading(true);
         await fetchAttendance();
       })
@@ -218,7 +226,7 @@ export default function Attendance(){
     <div className="employees-page">
       <div className="employees-header">
         <div>
-          <h1 className="attendance-title">Attendance Management</h1>
+          <h1 className="page-title attendance-title">Attendance Management</h1>
           <p className="attendance-subtitle">Attendance Table</p>
         </div>
       </div>
@@ -371,6 +379,18 @@ export default function Attendance(){
           </table>
         </div>
       </section>
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteRecord)}
+        title="Delete Attendance Record?"
+        message={`This will delete attendance record #${pendingDeleteRecord?.id || ""}.`}
+        confirmLabel="Delete Record"
+        cancelLabel="Cancel"
+        isSubmitting={submitting}
+        onCancel={closeDeleteModal}
+        onConfirm={confirmDelete}
+        variant="danger"
+      />
     </div>
   );
 }
