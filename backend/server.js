@@ -1316,6 +1316,248 @@ app.put("/employees/:employeeId/salary-history/drafts/:draftId", authenticateTok
 });
 
 
+// Cancel Salary Draft (Admin only)
+app.post("/employees/:employeeId/salary-history/drafts/:draftId/cancel", authenticateToken, requireRoles("Admin"), async(req,res)=>{
+
+  const { employeeId, draftId } = req.params;
+
+  if(!/^[1-9][0-9]*$/.test(employeeId)){
+    return res.status(400).json({
+      message:"Invalid employee id"
+    });
+  }
+
+  if(!/^[1-9][0-9]*$/.test(draftId)){
+    return res.status(400).json({
+      message:"Invalid draft id"
+    });
+  }
+
+  if(req.body === null || typeof req.body !== "object" || Array.isArray(req.body)){
+    return res.status(400).json({
+      message:"Invalid request body"
+    });
+  }
+
+  const protectedFields = new Set([
+    "id",
+    "employee_id",
+    "record_status",
+    "effective_to",
+    "source_type",
+    "source_reference",
+    "created_by_user_id",
+    "created_at",
+    "updated_at",
+    "approved_by_user_id",
+    "approved_at",
+    "cancelled_by_user_id",
+    "cancelled_at",
+    "role",
+    "user_id",
+    "salary_amount",
+    "salary_basis",
+    "currency_code",
+    "effective_from",
+    "reason"
+  ]);
+
+  const allowedFields = new Set([
+    "expected_updated_at"
+  ]);
+
+  const bodyKeys = Object.keys(req.body);
+  const protectedField = bodyKeys.find((key) => protectedFields.has(key));
+
+  if(protectedField){
+    return res.status(400).json({
+      message:`Protected field: ${protectedField}`
+    });
+  }
+
+  const unexpectedField = bodyKeys.find((key) => !allowedFields.has(key));
+
+  if(unexpectedField){
+    return res.status(400).json({
+      message:`Unexpected field: ${unexpectedField}`
+    });
+  }
+
+  const { expected_updated_at } = req.body;
+
+  if(expected_updated_at === undefined || !isValidTimestampToken(expected_updated_at)){
+    return res.status(400).json({
+      message:"Invalid expected_updated_at"
+    });
+  }
+
+  const parsedEmployeeId = Number(employeeId);
+  const parsedDraftId = Number(draftId);
+  const normalizedExpectedUpdatedAt = expected_updated_at.trim();
+
+  const client = await pool.connect();
+  let transactionActive = false;
+
+  try {
+
+    await client.query("BEGIN");
+    transactionActive = true;
+
+    const draftResult = await client.query(
+      `SELECT id,
+              employee_id,
+              record_status,
+              updated_at,
+              salary_amount,
+              salary_basis,
+              currency_code,
+              effective_from,
+              effective_to,
+              reason,
+              source_type,
+              source_reference,
+              created_by_user_id,
+              created_at,
+              approved_by_user_id,
+              approved_at,
+              cancelled_by_user_id,
+              cancelled_at,
+              to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US') AS updated_at_signature
+       FROM employee_salary_history
+       WHERE id=$1
+         AND employee_id=$2
+       FOR UPDATE`,
+      [parsedDraftId, parsedEmployeeId]
+    );
+
+    if(draftResult.rows.length === 0){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(404).json({
+        message:"Salary draft not found"
+      });
+    }
+
+    const existingDraft = draftResult.rows[0];
+
+    if(existingDraft.record_status !== "DRAFT"){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(409).json({
+        message:"Salary draft is no longer cancellable"
+      });
+    }
+
+    const expectedUpdatedAtDate = new Date(normalizedExpectedUpdatedAt);
+    const currentUpdatedAtDate = existingDraft.updated_at instanceof Date
+      ? existingDraft.updated_at
+      : new Date(existingDraft.updated_at);
+
+    if(expectedUpdatedAtDate.getTime() !== currentUpdatedAtDate.getTime()){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(409).json({
+        message:"Salary draft was updated by another session"
+      });
+    }
+
+    if(existingDraft.cancelled_by_user_id !== null || existingDraft.cancelled_at !== null){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(409).json({
+        message:"Salary draft is no longer cancellable"
+      });
+    }
+
+    const updateResult = await client.query(
+      `UPDATE employee_salary_history
+       SET record_status='CANCELLED',
+           cancelled_by_user_id=$1,
+           cancelled_at=now(),
+           updated_at=now()
+       WHERE id=$2
+         AND employee_id=$3
+         AND record_status='DRAFT'
+         AND to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS.US') = $4
+       RETURNING id,
+                 employee_id,
+                 salary_amount,
+                 salary_basis,
+                 currency_code,
+                 effective_from,
+                 effective_to,
+                 record_status,
+                 reason,
+                 source_type,
+                 source_reference,
+                 created_by_user_id,
+                 created_at,
+                 updated_at,
+                 approved_by_user_id,
+                 approved_at,
+                 cancelled_by_user_id,
+                 cancelled_at` ,
+      [
+        req.user.id,
+        parsedDraftId,
+        parsedEmployeeId,
+        existingDraft.updated_at_signature
+      ]
+    );
+
+    if(updateResult.rows.length === 0){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(409).json({
+        message:"Salary draft was updated by another session"
+      });
+    }
+
+    await client.query("COMMIT");
+    transactionActive = false;
+
+    const cancelledDraft = updateResult.rows[0];
+
+    return res.status(200).json({
+      message:"Salary draft cancelled",
+      draft:{
+        ...cancelledDraft,
+        effective_from: formatDateOnly(cancelledDraft.effective_from),
+        effective_to: formatDateOnly(cancelledDraft.effective_to)
+      }
+    });
+
+  } catch(error){
+
+    if(transactionActive){
+      try {
+        await client.query("ROLLBACK");
+      } catch (_) {}
+    }
+
+    if(error.code === "23514"){
+      return res.status(400).json({
+        message:"Invalid salary draft payload"
+      });
+    }
+
+    console.log(error);
+
+    return res.status(500).json({
+      message:"Server error"
+    });
+
+  } finally {
+    client.release();
+  }
+});
+
+
 // Create Employment Details
 // Legacy salary_amount is compatibility data only; salary changes belong in employee_salary_history.
 app.post("/employees/:id/employment", authenticateToken, requireRoles("Admin"), async(req,res)=>{
