@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import api from "../services/api";
+import SalaryApproveModal from "./SalaryApproveModal";
 import SalaryDraftModal from "./SalaryDraftModal";
 
 const STATUS_LABELS = {
@@ -163,6 +164,21 @@ export default function SalaryManagementSection({
   const [createDraftSubmitting, setCreateDraftSubmitting] = useState(false);
   const [createDraftError, setCreateDraftError] = useState("");
   const [createDraftNotice, setCreateDraftNotice] = useState("");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editDraftSubmitting, setEditDraftSubmitting] = useState(false);
+  const [editDraftError, setEditDraftError] = useState("");
+  const [editDraftNotice, setEditDraftNotice] = useState("");
+  const [editDraftSnapshot, setEditDraftSnapshot] = useState(null);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelDraftSubmitting, setCancelDraftSubmitting] = useState(false);
+  const [cancelDraftError, setCancelDraftError] = useState("");
+  const [cancelDraftNotice, setCancelDraftNotice] = useState("");
+  const [cancelDraftSnapshot, setCancelDraftSnapshot] = useState(null);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [approveDraftSubmitting, setApproveDraftSubmitting] = useState(false);
+  const [approveDraftError, setApproveDraftError] = useState("");
+  const [approveDraftNotice, setApproveDraftNotice] = useState("");
+  const [approveDraftSnapshot, setApproveDraftSnapshot] = useState(null);
 
   const isSalaryConfigured = employment?.salary_configured === true;
 
@@ -238,7 +254,13 @@ export default function SalaryManagementSection({
 
   const openCreateModal = () => {
     setCreateDraftError("");
+    setEditDraftError("");
+    setCancelDraftError("");
+    setApproveDraftError("");
     setCreateDraftNotice("");
+    setEditDraftNotice("");
+    setCancelDraftNotice("");
+    setApproveDraftNotice("");
     setIsCreateModalOpen(true);
   };
 
@@ -249,6 +271,108 @@ export default function SalaryManagementSection({
 
     setCreateDraftError("");
     setIsCreateModalOpen(false);
+  };
+
+  const openEditModal = () => {
+    if (!activeDraftRow) {
+      return;
+    }
+
+    setCreateDraftError("");
+    setEditDraftError("");
+    setCancelDraftError("");
+    setApproveDraftError("");
+    setCreateDraftNotice("");
+    setEditDraftNotice("");
+    setCancelDraftNotice("");
+    setApproveDraftNotice("");
+    setEditDraftSnapshot({
+      id: activeDraftRow.id,
+      salary_amount: activeDraftRow.salary_amount,
+      salary_basis: activeDraftRow.salary_basis,
+      currency_code: activeDraftRow.currency_code,
+      effective_from: activeDraftRow.effective_from,
+      reason: activeDraftRow.reason,
+      updated_at: activeDraftRow.updated_at
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    if (editDraftSubmitting) {
+      return;
+    }
+
+    setEditDraftError("");
+    setIsEditModalOpen(false);
+    setEditDraftSnapshot(null);
+  };
+
+  const openCancelModal = () => {
+    if (!activeDraftRow) {
+      return;
+    }
+
+    setCreateDraftError("");
+    setEditDraftError("");
+    setCancelDraftError("");
+    setApproveDraftError("");
+    setCreateDraftNotice("");
+    setEditDraftNotice("");
+    setCancelDraftNotice("");
+    setApproveDraftNotice("");
+    setCancelDraftSnapshot({
+      id: activeDraftRow.id,
+      updated_at: activeDraftRow.updated_at,
+      reason: activeDraftRow.reason,
+      effective_from: activeDraftRow.effective_from
+    });
+    setIsCancelModalOpen(true);
+  };
+
+  const closeCancelModal = () => {
+    if (cancelDraftSubmitting) {
+      return;
+    }
+
+    setCancelDraftError("");
+    setIsCancelModalOpen(false);
+    setCancelDraftSnapshot(null);
+  };
+
+  const openApproveModal = () => {
+    if (!activeDraftRow) {
+      return;
+    }
+
+    setCreateDraftError("");
+    setEditDraftError("");
+    setCancelDraftError("");
+    setApproveDraftError("");
+    setCreateDraftNotice("");
+    setEditDraftNotice("");
+    setCancelDraftNotice("");
+    setApproveDraftNotice("");
+    setApproveDraftSnapshot({
+      id: activeDraftRow.id,
+      salary_amount: activeDraftRow.salary_amount,
+      salary_basis: activeDraftRow.salary_basis,
+      currency_code: activeDraftRow.currency_code,
+      effective_from: activeDraftRow.effective_from,
+      reason: activeDraftRow.reason,
+      updated_at: activeDraftRow.updated_at
+    });
+    setIsApproveModalOpen(true);
+  };
+
+  const closeApproveModal = () => {
+    if (approveDraftSubmitting) {
+      return;
+    }
+
+    setApproveDraftError("");
+    setIsApproveModalOpen(false);
+    setApproveDraftSnapshot(null);
   };
 
   const handleCreateDraftSubmit = async (payload) => {
@@ -292,6 +416,196 @@ export default function SalaryManagementSection({
       }
     } finally {
       setCreateDraftSubmitting(false);
+    }
+  };
+
+  const handleEditDraftSubmit = async (payload) => {
+    if (editDraftSubmitting || !employeeId || !editDraftSnapshot?.id) {
+      return;
+    }
+
+    setEditDraftSubmitting(true);
+    setEditDraftError("");
+    setEditDraftNotice("");
+
+    try {
+      await api.put(
+        `/employees/${employeeId}/salary-history/drafts/${editDraftSnapshot.id}`,
+        payload
+      );
+
+      setIsEditModalOpen(false);
+      setEditDraftSnapshot(null);
+      setEditDraftNotice("Salary draft updated successfully.");
+
+      if (typeof onRefresh === "function") {
+        await onRefresh();
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      const backendMessage = err?.response?.data?.message;
+
+      if (status === 400) {
+        setEditDraftError(backendMessage || "Invalid salary draft input.");
+      } else if (status === 403) {
+        setEditDraftError("You do not have permission to manage salary.");
+      } else if (status === 404) {
+        setEditDraftError("Salary draft was not found. Refreshing the latest salary information.");
+        setIsEditModalOpen(false);
+        setEditDraftSnapshot(null);
+
+        if (typeof onRefresh === "function") {
+          await onRefresh();
+        }
+      } else if (status === 409) {
+        const conflictMessage =
+          backendMessage === "Salary draft is no longer editable"
+            ? "This salary draft is no longer editable. Refreshing the latest salary information."
+            : "This salary draft was changed by another session. Refreshing the latest version.";
+
+        setEditDraftError(conflictMessage);
+        setIsEditModalOpen(false);
+        setEditDraftSnapshot(null);
+
+        if (typeof onRefresh === "function") {
+          await onRefresh();
+        }
+      } else if (status === 401) {
+        setEditDraftError("Session expired. Redirecting to login...");
+      } else {
+        setEditDraftError("Failed to update salary draft. Please try again.");
+      }
+    } finally {
+      setEditDraftSubmitting(false);
+    }
+  };
+
+  const handleCancelDraftSubmit = async () => {
+    if (cancelDraftSubmitting || !employeeId || !cancelDraftSnapshot?.id) {
+      return;
+    }
+
+    setCancelDraftSubmitting(true);
+    setCancelDraftError("");
+    setCancelDraftNotice("");
+
+    try {
+      await api.post(
+        `/employees/${employeeId}/salary-history/drafts/${cancelDraftSnapshot.id}/cancel`,
+        {
+          expected_updated_at: cancelDraftSnapshot.updated_at
+        }
+      );
+
+      setIsCancelModalOpen(false);
+      setCancelDraftSnapshot(null);
+      setCancelDraftNotice("Salary change cancelled successfully.");
+
+      if (typeof onRefresh === "function") {
+        await onRefresh();
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      const backendMessage = err?.response?.data?.message;
+
+      if (status === 400) {
+        setCancelDraftError(backendMessage || "Invalid salary draft input.");
+      } else if (status === 403) {
+        setCancelDraftError("You do not have permission to cancel salary changes.");
+      } else if (status === 404) {
+        setCancelDraftError("Salary draft was not found. Refreshing the latest salary information.");
+        setIsCancelModalOpen(false);
+        setCancelDraftSnapshot(null);
+
+        if (typeof onRefresh === "function") {
+          await onRefresh();
+        }
+      } else if (status === 409) {
+        const conflictMessage =
+          backendMessage === "Salary draft is no longer cancellable"
+            ? "This salary draft is no longer available for cancellation."
+            : "This salary draft was changed by another session. Salary information has been refreshed.";
+
+        setCancelDraftError(conflictMessage);
+        setIsCancelModalOpen(false);
+        setCancelDraftSnapshot(null);
+
+        if (typeof onRefresh === "function") {
+          await onRefresh();
+        }
+      } else if (status === 401) {
+        setCancelDraftError("Session expired. Redirecting to login...");
+      } else {
+        setCancelDraftError("Failed to cancel salary change.");
+      }
+    } finally {
+      setCancelDraftSubmitting(false);
+    }
+  };
+
+  const handleApproveDraftSubmit = async () => {
+    if (approveDraftSubmitting || !employeeId || !approveDraftSnapshot?.id) {
+      return;
+    }
+
+    setApproveDraftSubmitting(true);
+    setApproveDraftError("");
+    setApproveDraftNotice("");
+
+    try {
+      await api.post(
+        `/employees/${employeeId}/salary-history/drafts/${approveDraftSnapshot.id}/approve`,
+        {
+          expected_updated_at: approveDraftSnapshot.updated_at
+        }
+      );
+
+      setIsApproveModalOpen(false);
+      setApproveDraftSnapshot(null);
+      setApproveDraftNotice("Salary change approved successfully.");
+
+      if (typeof onRefresh === "function") {
+        await onRefresh();
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      const backendMessage = err?.response?.data?.message;
+
+      if (status === 400) {
+        setApproveDraftError(backendMessage || "Invalid salary draft input.");
+      } else if (status === 403) {
+        setApproveDraftError("You do not have permission to approve salary changes.");
+      } else if (status === 404) {
+        setApproveDraftError("Salary draft was not found. Salary information has been refreshed.");
+        setIsApproveModalOpen(false);
+        setApproveDraftSnapshot(null);
+
+        if (typeof onRefresh === "function") {
+          await onRefresh();
+        }
+      } else if (status === 409) {
+        const conflictMessage =
+          backendMessage === "Salary draft is no longer approvable"
+            ? "This salary draft changed in another session. Salary information has been refreshed."
+            : backendMessage === "Salary timeline conflict" ||
+              backendMessage === "Salary publication would rewrite historical salary"
+              ? "This salary change cannot be approved because its effective date conflicts with the existing salary timeline."
+              : "This salary draft changed in another session. Salary information has been refreshed.";
+
+        setApproveDraftError(conflictMessage);
+        setIsApproveModalOpen(false);
+        setApproveDraftSnapshot(null);
+
+        if (typeof onRefresh === "function") {
+          await onRefresh();
+        }
+      } else if (status === 401) {
+        setApproveDraftError("Session expired. Redirecting to login...");
+      } else {
+        setApproveDraftError("Failed to approve salary change.");
+      }
+    } finally {
+      setApproveDraftSubmitting(false);
     }
   };
 
@@ -368,6 +682,12 @@ export default function SalaryManagementSection({
 
       {createDraftNotice && <p className="profile-success">{createDraftNotice}</p>}
       {createDraftError && !isCreateModalOpen && <p className="profile-error">{createDraftError}</p>}
+      {editDraftNotice && <p className="profile-success">{editDraftNotice}</p>}
+      {editDraftError && !isEditModalOpen && <p className="profile-error">{editDraftError}</p>}
+      {cancelDraftNotice && <p className="profile-success">{cancelDraftNotice}</p>}
+      {cancelDraftError && !isCancelModalOpen && <p className="profile-error">{cancelDraftError}</p>}
+      {approveDraftNotice && <p className="profile-success">{approveDraftNotice}</p>}
+      {approveDraftError && !isApproveModalOpen && <p className="profile-error">{approveDraftError}</p>}
 
       <div className="salary-summary-grid">
         <article className="salary-summary-card">
@@ -399,10 +719,38 @@ export default function SalaryManagementSection({
       {activeDraftRow && (
         <article className="salary-draft-card">
           <div className="salary-draft-head">
-            <h4>Pending Salary Change</h4>
-            <span className={`salary-status-badge ${getStatusBadgeClass(activeDraftRow.record_status)}`}>
-              {getStatusLabel(activeDraftRow.record_status)}
-            </span>
+            <div className="salary-draft-head-left">
+              <h4>Pending Salary Change</h4>
+              <span className={`salary-status-badge ${getStatusBadgeClass(activeDraftRow.record_status)}`}>
+                {getStatusLabel(activeDraftRow.record_status)}
+              </span>
+            </div>
+            <div className="salary-draft-actions">
+              <button
+                type="button"
+                className="btn-secondary salary-draft-edit-btn"
+                onClick={openEditModal}
+                disabled={editDraftSubmitting || cancelDraftSubmitting || approveDraftSubmitting}
+              >
+                Edit Draft
+              </button>
+              <button
+                type="button"
+                className="btn-danger salary-draft-cancel-btn"
+                onClick={openCancelModal}
+                disabled={editDraftSubmitting || cancelDraftSubmitting || approveDraftSubmitting}
+              >
+                Cancel Draft
+              </button>
+              <button
+                type="button"
+                className="btn-primary salary-draft-approve-btn"
+                onClick={openApproveModal}
+                disabled={editDraftSubmitting || cancelDraftSubmitting || approveDraftSubmitting}
+              >
+                Approve Draft
+              </button>
+            </div>
           </div>
 
           <div className="profile-fields profile-fields-three salary-draft-fields">
@@ -491,6 +839,7 @@ export default function SalaryManagementSection({
       </div>
 
       <SalaryDraftModal
+        mode="create"
         isOpen={isCreateModalOpen}
         title={draftModalTitle}
         note="This creates a draft only. The employee's official salary will not change until the draft is approved."
@@ -508,6 +857,120 @@ export default function SalaryManagementSection({
         submitError={createDraftError}
         onCancel={closeCreateModal}
         onSubmit={handleCreateDraftSubmit}
+      />
+
+      <SalaryDraftModal
+        mode="edit"
+        isOpen={isEditModalOpen}
+        title="Edit Salary Draft"
+        note="This updates the existing draft only. The employee's official salary will not change until the draft is approved."
+        defaultBasis="MONTHLY"
+        defaultCurrency="MYR"
+        initialValues={editDraftSnapshot}
+        expectedUpdatedAt={editDraftSnapshot?.updated_at}
+        submitting={editDraftSubmitting}
+        submitError={editDraftError}
+        onCancel={closeEditModal}
+        onSubmit={handleEditDraftSubmit}
+      />
+
+      {isCancelModalOpen && (
+        <div className="salary-modal-backdrop" role="presentation">
+          <div
+            className="salary-modal salary-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="salary-cancel-modal-title"
+          >
+            <h4 id="salary-cancel-modal-title">Cancel Salary Change?</h4>
+            <p className="salary-modal-note">
+              This salary proposal will be cancelled and kept in Salary History for audit purposes.
+              It will never become the active salary.
+            </p>
+
+            <div className="profile-fields">
+              <div className="profile-field">
+                <span>Proposed Salary</span>
+                <strong>
+                  {formatSalaryLine(
+                    cancelDraftSnapshot?.salary_amount,
+                    cancelDraftSnapshot?.currency_code || activeDraftRow?.currency_code,
+                    cancelDraftSnapshot?.salary_basis || activeDraftRow?.salary_basis
+                  ) || "-"}
+                </strong>
+              </div>
+              <div className="profile-field">
+                <span>Effective From</span>
+                <strong>{formatDateDisplay(cancelDraftSnapshot?.effective_from || activeDraftRow?.effective_from || "")}</strong>
+              </div>
+              <div className="profile-field">
+                <span>Reason</span>
+                <strong>{cancelDraftSnapshot?.reason || activeDraftRow?.reason || "-"}</strong>
+              </div>
+            </div>
+
+            {cancelDraftError && <p className="profile-error">{cancelDraftError}</p>}
+
+            <div className="profile-form-actions salary-modal-actions salary-confirm-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={closeCancelModal}
+                disabled={cancelDraftSubmitting}
+              >
+                Keep Draft
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={handleCancelDraftSubmit}
+                disabled={cancelDraftSubmitting}
+              >
+                {cancelDraftSubmitting ? "Cancelling..." : "Cancel Salary Change"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SalaryApproveModal
+        isOpen={isApproveModalOpen}
+        title="Approve Salary Change?"
+        note="This will update the employee's official salary history."
+        currentSalaryLabel={
+          isSalaryConfigured
+            ? formatSalaryLine(employment?.salary_amount, employment?.salary_currency_code, employment?.salary_basis) || "-"
+            : "Not configured"
+        }
+        newSalaryLabel={
+          formatSalaryLine(
+            approveDraftSnapshot?.salary_amount,
+            approveDraftSnapshot?.currency_code,
+            approveDraftSnapshot?.salary_basis
+          ) || "-"
+        }
+        effectiveFromLabel={formatDateDisplay(approveDraftSnapshot?.effective_from || "")}
+        reason={approveDraftSnapshot?.reason || "-"}
+        futureNotice={
+          (() => {
+            const effectiveDate = getComparableDate(approveDraftSnapshot?.effective_from || "");
+            if (!effectiveDate) {
+              return "";
+            }
+
+            const today = new Date();
+            const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+            if (effectiveDate.getTime() > todayUtc.getTime()) {
+              return `This salary will become effective on ${formatDateDisplay(approveDraftSnapshot.effective_from || "")}.`;
+            }
+
+            return "";
+          })()
+        }
+        submitting={approveDraftSubmitting}
+        submitError={approveDraftError}
+        onCancel={closeApproveModal}
+        onSubmit={handleApproveDraftSubmit}
       />
     </div>
   );

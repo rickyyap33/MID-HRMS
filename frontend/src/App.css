@@ -538,6 +538,32 @@ body{
 }
 
 
+.salary-draft-head-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+
+.salary-draft-edit-btn{
+  white-space:nowrap;
+}
+
+
+.salary-draft-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+
+.salary-draft-cancel-btn{
+  white-space:nowrap;
+}
+
+
 .salary-draft-fields{
   margin-top:0;
 }
@@ -687,6 +713,16 @@ body{
 
 
 .salary-modal-actions{
+  justify-content:flex-end;
+}
+
+
+.salary-confirm-modal{
+  max-width:640px;
+}
+
+
+.salary-confirm-actions{
   justify-content:flex-end;
 }
 

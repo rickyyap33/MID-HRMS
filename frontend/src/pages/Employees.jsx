@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 
@@ -6,82 +6,173 @@ export default function Employees() {
 	const [employees, setEmployees] = useState([]);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [loading, setLoading] = useState(true);
-	const [saving, setSaving] = useState(false);
+	const [pageMessage, setPageMessage] = useState("");
+	const [pageError, setPageError] = useState("");
+	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+	const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+	const [employeeForm, setEmployeeForm] = useState({
+		name: "",
+		email: "",
+		position: "",
+		department: ""
+	});
+	const [editingEmployeeId, setEditingEmployeeId] = useState(null);
+	const [modalError, setModalError] = useState("");
+	const [modalSubmitting, setModalSubmitting] = useState(false);
 
-	useEffect(() => {
-		const fetchEmployees = async () => {
-			try {
-				const response = await api.get("/employees");
-				setEmployees(response.data || []);
-			} catch (error) {
-				alert(error.response?.data?.message || "Failed to load employees");
-			} finally {
+	const fetchEmployees = useCallback(async (showLoading = true) => {
+		if (showLoading) {
+			setLoading(true);
+		}
+
+		try {
+			const response = await api.get("/employees");
+			setEmployees(response.data || []);
+		} catch (error) {
+			setPageError(error.response?.data?.message || "Failed to load employees.");
+		} finally {
+			if (showLoading) {
 				setLoading(false);
 			}
-		};
-
-		fetchEmployees();
+		}
 	}, []);
 
-	const handleAddEmployee = async () => {
-		const name = window.prompt("Employee Name");
-		if (!name) return;
+	useEffect(() => {
+		fetchEmployees();
+	}, [fetchEmployees]);
 
-		const email = window.prompt("Employee Email");
-		if (!email) return;
-
-		const position = window.prompt("Position");
-		if (!position) return;
-
-		const department = window.prompt("Department");
-		if (!department) return;
-
-		setSaving(true);
-		try {
-			const response = await api.post("/employees", {
-				name,
-				email,
-				position,
-				department
-			});
-
-			setEmployees((prev) => [response.data, ...prev]);
-		} catch (error) {
-			alert(error.response?.data?.message || "Failed to add employee");
-		} finally {
-			setSaving(false);
-		}
+	const resetForm = () => {
+		setEmployeeForm({
+			name: "",
+			email: "",
+			position: "",
+			department: ""
+		});
 	};
 
-	const handleEditEmployee = (employeeId) => {
+	const openAddModal = () => {
+		setPageError("");
+		setPageMessage("");
+		setModalError("");
+		setEditingEmployeeId(null);
+		resetForm();
+		setIsAddModalOpen(true);
+	};
+
+	const openEditModal = (employeeId) => {
 		const target = employees.find((emp) => emp.id === employeeId);
 		if (!target) return;
 
-		const updatedName = window.prompt("Update Name", target.name || "");
-		if (updatedName === null) return;
+		setPageError("");
+		setPageMessage("");
+		setModalError("");
+		setEditingEmployeeId(employeeId);
+		setEmployeeForm({
+			name: target.name || "",
+			email: target.email || "",
+			position: target.position || "",
+			department: target.department || ""
+		});
+		setIsEditModalOpen(true);
+	};
 
-		const updatedEmail = window.prompt("Update Email", target.email || "");
-		if (updatedEmail === null) return;
+	const closeModals = () => {
+		if (modalSubmitting) return;
 
-		const updatedPosition = window.prompt("Update Position", target.position || "");
-		if (updatedPosition === null) return;
+		setIsAddModalOpen(false);
+		setIsEditModalOpen(false);
+		setModalError("");
+		setEditingEmployeeId(null);
+	};
 
-		const updatedDepartment = window.prompt("Update Department", target.department || "");
-		if (updatedDepartment === null) return;
+	const handleFormChange = (field, value) => {
+		if (modalError) {
+			setModalError("");
+		}
+		setEmployeeForm((prev) => ({ ...prev, [field]: value }));
+	};
 
-		setEmployees((prev) =>
-			prev.map((emp) =>
-				emp.id === employeeId
-					? {
-							...emp,
-							name: updatedName,
-							email: updatedEmail,
-							position: updatedPosition,
-							department: updatedDepartment
-						}
-					: emp
-			)
-		);
+	const validateEmployeeForm = () => {
+		const trimmedName = employeeForm.name.trim();
+		const trimmedEmail = employeeForm.email.trim();
+		const trimmedPosition = employeeForm.position.trim();
+		const trimmedDepartment = employeeForm.department.trim();
+
+		if (!trimmedName) return "Name is required.";
+		if (!trimmedEmail) return "Email is required.";
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) return "Email format is invalid.";
+		if (!trimmedPosition) return "Position is required.";
+		if (!trimmedDepartment) return "Department is required.";
+
+		return "";
+	};
+
+	const handleAddEmployeeSubmit = async (event) => {
+		event.preventDefault();
+
+		if (modalSubmitting) return;
+
+		const validationError = validateEmployeeForm();
+		if (validationError) {
+			setModalError(validationError);
+			return;
+		}
+
+		setModalSubmitting(true);
+		setModalError("");
+
+		try {
+			await api.post("/employees", {
+				name: employeeForm.name.trim(),
+				email: employeeForm.email.trim(),
+				position: employeeForm.position.trim(),
+				department: employeeForm.department.trim()
+			});
+
+			setIsAddModalOpen(false);
+			resetForm();
+			await fetchEmployees(false);
+			setPageError("");
+			setPageMessage("Employee added successfully.");
+		} catch (error) {
+			setModalError(error.response?.data?.message || "Failed to add employee.");
+		} finally {
+			setModalSubmitting(false);
+		}
+	};
+
+	const handleEditEmployeeSubmit = async (event) => {
+		event.preventDefault();
+
+		if (modalSubmitting || !editingEmployeeId) return;
+
+		const validationError = validateEmployeeForm();
+		if (validationError) {
+			setModalError(validationError);
+			return;
+		}
+
+		setModalSubmitting(true);
+		setModalError("");
+
+		try {
+			await api.put(`/employees/${editingEmployeeId}`, {
+				name: employeeForm.name.trim(),
+				email: employeeForm.email.trim(),
+				position: employeeForm.position.trim(),
+				department: employeeForm.department.trim()
+			});
+
+			setIsEditModalOpen(false);
+			setEditingEmployeeId(null);
+			await fetchEmployees(false);
+			setPageError("");
+			setPageMessage("Employee updated successfully.");
+		} catch (error) {
+			setModalError(error.response?.data?.message || "Failed to update employee.");
+		} finally {
+			setModalSubmitting(false);
+		}
 	};
 
 	const handleDeleteEmployee = (employeeId) => {
@@ -129,12 +220,14 @@ export default function Employees() {
 
 				<button
 					className="btn-primary"
-					onClick={handleAddEmployee}
-					disabled={saving}
+					onClick={openAddModal}
 				>
-					{saving ? "Saving..." : "Add Employee"}
+					Add Employee
 				</button>
 			</div>
+
+			{pageMessage ? <p className="profile-success">{pageMessage}</p> : null}
+			{pageError ? <p className="profile-error">{pageError}</p> : null}
 
 			<div className="employees-toolbar">
 				<input
@@ -193,7 +286,7 @@ export default function Employees() {
 
 											<button
 												className="btn-secondary"
-												onClick={() => handleEditEmployee(employee.id)}
+												onClick={() => openEditModal(employee.id)}
 											>
 												Edit
 											</button>
@@ -212,6 +305,132 @@ export default function Employees() {
 					</tbody>
 				</table>
 			</div>
+
+			{isAddModalOpen ? (
+				<div className="salary-modal-backdrop" role="presentation">
+					<div className="salary-modal" role="dialog" aria-modal="true" aria-labelledby="add-employee-title">
+						<h4 id="add-employee-title">Add Employee</h4>
+						<p className="salary-modal-note">Create a new employee record.</p>
+
+						<form className="salary-modal-form" onSubmit={handleAddEmployeeSubmit} noValidate>
+							<div className="profile-field">
+								<span>Full Name</span>
+								<input
+									className="profile-input"
+									value={employeeForm.name}
+									onChange={(e) => handleFormChange("name", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							<div className="profile-field">
+								<span>Email</span>
+								<input
+									className="profile-input"
+									type="email"
+									value={employeeForm.email}
+									onChange={(e) => handleFormChange("email", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							<div className="profile-field">
+								<span>Position</span>
+								<input
+									className="profile-input"
+									value={employeeForm.position}
+									onChange={(e) => handleFormChange("position", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							<div className="profile-field">
+								<span>Department</span>
+								<input
+									className="profile-input"
+									value={employeeForm.department}
+									onChange={(e) => handleFormChange("department", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							{modalError ? <p className="profile-error">{modalError}</p> : null}
+
+							<div className="profile-form-actions salary-modal-actions">
+								<button type="button" className="btn-secondary" onClick={closeModals} disabled={modalSubmitting}>
+									Cancel
+								</button>
+								<button type="submit" className="btn-primary" disabled={modalSubmitting}>
+									{modalSubmitting ? "Adding..." : "Add Employee"}
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			) : null}
+
+			{isEditModalOpen ? (
+				<div className="salary-modal-backdrop" role="presentation">
+					<div className="salary-modal" role="dialog" aria-modal="true" aria-labelledby="edit-employee-title">
+						<h4 id="edit-employee-title">Edit Employee</h4>
+						<p className="salary-modal-note">Update the employee record.</p>
+
+						<form className="salary-modal-form" onSubmit={handleEditEmployeeSubmit} noValidate>
+							<div className="profile-field">
+								<span>Full Name</span>
+								<input
+									className="profile-input"
+									value={employeeForm.name}
+									onChange={(e) => handleFormChange("name", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							<div className="profile-field">
+								<span>Email</span>
+								<input
+									className="profile-input"
+									type="email"
+									value={employeeForm.email}
+									onChange={(e) => handleFormChange("email", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							<div className="profile-field">
+								<span>Position</span>
+								<input
+									className="profile-input"
+									value={employeeForm.position}
+									onChange={(e) => handleFormChange("position", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							<div className="profile-field">
+								<span>Department</span>
+								<input
+									className="profile-input"
+									value={employeeForm.department}
+									onChange={(e) => handleFormChange("department", e.target.value)}
+									disabled={modalSubmitting}
+								/>
+							</div>
+
+							{modalError ? <p className="profile-error">{modalError}</p> : null}
+
+							<div className="profile-form-actions salary-modal-actions">
+								<button type="button" className="btn-secondary" onClick={closeModals} disabled={modalSubmitting}>
+									Cancel
+								</button>
+								<button type="submit" className="btn-primary" disabled={modalSubmitting}>
+									{modalSubmitting ? "Saving..." : "Save Changes"}
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			) : null}
 		</div>
 	);
 }

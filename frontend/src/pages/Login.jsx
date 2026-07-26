@@ -48,7 +48,7 @@ export default function Login() {
       padding:"50px"
     }}>
 
-      <h1>
+      <h1 style={{ color:"#111827" }}>
         MID Studio HRMS
       </h1>
 

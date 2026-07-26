@@ -27,25 +27,49 @@ const isValidDateOnly = (value) => {
 };
 
 export default function SalaryDraftModal({
+  mode = "create",
   isOpen,
   title,
   note,
   defaultBasis,
   defaultCurrency,
+  initialValues,
+  expectedUpdatedAt,
   submitting,
   submitError,
   onCancel,
   onSubmit
 }) {
   const initialForm = useMemo(
-    () => ({
-      salary_amount: "",
-      salary_basis: defaultBasis,
-      currency_code: defaultCurrency,
-      effective_from: "",
-      reason: ""
-    }),
-    [defaultBasis, defaultCurrency]
+    () => {
+      if (mode === "edit" && initialValues) {
+        return {
+          salary_amount:
+            initialValues.salary_amount === null || initialValues.salary_amount === undefined
+              ? ""
+              : String(initialValues.salary_amount),
+          salary_basis: typeof initialValues.salary_basis === "string" ? initialValues.salary_basis : "MONTHLY",
+          currency_code:
+            typeof initialValues.currency_code === "string"
+              ? initialValues.currency_code.toUpperCase()
+              : "MYR",
+          effective_from:
+            typeof initialValues.effective_from === "string"
+              ? initialValues.effective_from.slice(0, 10)
+              : "",
+          reason: typeof initialValues.reason === "string" ? initialValues.reason : ""
+        };
+      }
+
+      return {
+        salary_amount: "",
+        salary_basis: defaultBasis,
+        currency_code: defaultCurrency,
+        effective_from: "",
+        reason: ""
+      };
+    },
+    [defaultBasis, defaultCurrency, initialValues, mode]
   );
 
   const [form, setForm] = useState(initialForm);
@@ -94,6 +118,10 @@ export default function SalaryDraftModal({
       return "Reason is required.";
     }
 
+    if (mode === "edit" && (typeof expectedUpdatedAt !== "string" || expectedUpdatedAt.trim() === "")) {
+      return "Draft concurrency token is missing. Please refresh and try again.";
+    }
+
     return "";
   };
 
@@ -111,14 +139,29 @@ export default function SalaryDraftModal({
       return;
     }
 
-    await onSubmit({
+    const payload = {
       salary_amount: String(form.salary_amount).trim(),
       salary_basis: form.salary_basis,
       currency_code: form.currency_code.trim(),
       effective_from: form.effective_from.trim(),
       reason: form.reason.trim()
-    });
+    };
+
+    if (mode === "edit") {
+      payload.expected_updated_at = expectedUpdatedAt.trim();
+    }
+
+    await onSubmit(payload);
   };
+
+  const primaryButtonLabel =
+    mode === "edit"
+      ? submitting
+        ? "Saving Draft..."
+        : "Save Draft"
+      : submitting
+        ? "Creating Draft..."
+        : "Create Draft";
 
   return (
     <div className="salary-modal-backdrop" role="presentation">
@@ -195,7 +238,7 @@ export default function SalaryDraftModal({
               Cancel
             </button>
             <button type="submit" className="btn-primary" disabled={submitting}>
-              {submitting ? "Creating Draft..." : "Create Draft"}
+              {primaryButtonLabel}
             </button>
           </div>
         </form>

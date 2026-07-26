@@ -293,3 +293,202 @@
 	- `node --check server.js` passed.
 	- `frontend npm run build` passed.
 - Next phase: UI-3 Edit Draft.
+
+## 22. Latest Phase Save State (2026-07-27)
+- PHASE 6A-M2C SALARY MANAGEMENT UI-3 PASS.
+- Implemented Edit Draft UI in frontend with modal reuse:
+	- `frontend/src/components/SalaryManagementSection.jsx`
+	- `frontend/src/components/SalaryDraftModal.jsx`
+	- `frontend/src/App.css`
+- UI-3 behavior confirmed:
+	- Pending Salary Change card now exposes `Edit Draft` only when an active DRAFT exists.
+	- No Cancel or Approve actions added in UI-3.
+	- Existing Change Salary action remains disabled while active DRAFT exists.
+- Modal reuse and edit mode:
+	- `SalaryDraftModal` now supports `mode="create"` and `mode="edit"` with shared validation.
+	- Edit modal title: `Edit Salary Draft`.
+	- Edit submit labels: `Save Draft` / `Saving Draft...`.
+	- Edit form initializes from active DRAFT values (`salary_amount`, `salary_basis`, `currency_code`, `effective_from`, `reason`).
+	- `expected_updated_at` token is required in edit mode and sent from the DRAFT snapshot.
+- API/edit payload behavior:
+	- UI sends only allowed edit fields:
+		- `salary_amount`, `salary_basis`, `currency_code`, `effective_from`, `reason`, `expected_updated_at`.
+	- Server-controlled fields are not sent.
+- Optimistic concurrency and conflict handling:
+	- `409` stale token path shows conflict messaging and refreshes employment + salary history.
+	- State-transition conflict (`Salary draft is no longer editable`) is handled separately with refresh.
+	- `404` draft-not-found path refreshes latest backend state.
+	- `400`/`403`/generic error paths render user-facing error messages without false success.
+- Current salary isolation preserved:
+	- Draft edits do not change Current Salary display.
+	- Current Salary remains employment-endpoint driven until future publish/approve flow.
+- Real protected HTTP integration validation passed (temporary employee flow):
+	- Used explicit env-based DB connection (`Pool({ host, port, database, user, password })`) from backend `.env`.
+	- Because localhost `5000` had stale runtime behavior, validation used controlled current backend on port `5001`.
+	- Temporary employee id `73` created.
+	- Draft created and then updated through real HTTP `PUT /employees/:employeeId/salary-history/drafts/:draftId`.
+	- Stale update retry with old `expected_updated_at` correctly returned `409`.
+	- Same draft row id preserved; no second DRAFT created; no PUBLISHED row created for temporary employee.
+	- Post-edit temporary employee employment endpoint remained non-configured (`404` path), confirming no current salary publication.
+- Audit-field immutability verified:
+	- `created_by_user_id` unchanged.
+	- `created_at` unchanged.
+	- `updated_at` changed after successful edit.
+	- `record_status` remained `DRAFT`.
+- Cleanup and invariants passed:
+	- Cleanup order by temp employee id: salary history -> employment details -> employee profile -> employee.
+	- Post-cleanup verification: temp employee count `0`, temp salary history count `0`.
+	- No temporary validation script remained.
+	- Employee 3 invariant unchanged (`RM6000.00 / MONTHLY / MYR`, `effective_from=2026-07-26`).
+	- `employment_details.salary_amount` for Employee 3 unchanged.
+	- `company_payroll_profile.payroll_enabled` unchanged (`false`).
+- Final checks passed:
+	- `frontend npm run build` passed.
+	- `node --check server.js` passed.
+- Next phase: UI-4 Cancel Draft.
+
+## 23. Latest Phase Save State (2026-07-27)
+- PHASE 6A-M2C SALARY MANAGEMENT UI-4 PASS.
+- Implemented Cancel Draft UI in frontend with confirmation flow:
+	- `frontend/src/components/SalaryManagementSection.jsx`
+	- `frontend/src/components/SalaryDraftModal.jsx`
+	- `frontend/src/App.css`
+- UI-4 behavior confirmed:
+	- Pending Salary Change card now exposes `Edit Draft` and `Cancel Draft` only when an active DRAFT exists.
+	- No Approve action added in UI-4.
+	- Cancel Draft opens a confirmation dialog instead of calling API immediately.
+- Confirmation modal behavior:
+	- Modal title: `Cancel Salary Change?`
+	- Body explains the proposal is cancelled and preserved in Salary History for audit.
+	- Buttons: `Keep Draft` and `Cancel Salary Change`.
+	- Destructive action styled consistently with existing MID-HRMS button system.
+- API/cancel payload behavior:
+	- UI sends only `expected_updated_at`.
+	- Concurrency token comes from active DRAFT `updated_at`.
+	- No server-controlled fields are sent.
+- Cancellation error handling:
+	- `400` shows backend validation error.
+	- `403` shows permission message without logout.
+	- `404` refreshes latest salary information.
+	- `409` stale token and no-longer-cancellable state both refresh latest salary information.
+	- `500` shows generic failure message.
+- Current salary isolation preserved:
+	- Cancelling a DRAFT does not change Current Salary.
+	- Cancelled row remains in Salary History with `Cancelled` status.
+	- Change Salary becomes available again after refresh.
+- Real protected HTTP integration validation passed (temporary employee flow):
+	- Used explicit env-based DB connection (`Pool({ host, port, database, user, password })`) from backend `.env`.
+	- Because localhost `5000` had stale runtime behavior, validation used controlled current backend on port `5001`.
+	- Temporary employee ids `74` and `75` were created for validation and cleaned up.
+	- Valid DRAFT cancellation returned `200`.
+	- `record_status` changed to `CANCELLED`.
+	- `cancelled_by_user_id` matched authenticated Admin id `1`.
+	- `cancelled_at` populated.
+	- Approval fields remained NULL.
+	- Same row id preserved; no second salary row created.
+	- Cancelled row remained visible through `GET /employees/:id/salary-history`.
+	- Stale expected_updated_at retry returned `409`.
+	- Double cancellation returned `409`.
+	- PUBLISHED-row cancellation attempt returned `409`.
+- Current salary and Employee 3 invariants passed:
+	- Employee 3 remained `RM6000.00 / MONTHLY / MYR` with `effective_from=2026-07-26`.
+	- Employee 3 salary history signature unchanged.
+	- `employment_details.salary_amount` for Employee 3 unchanged.
+	- `company_payroll_profile.payroll_enabled` unchanged (`false`).
+- Guaranteed cleanup passed:
+	- Cleanup order executed by temporary employee id: salary history rows -> employment details -> employee profile -> employee.
+	- Post-cleanup verification: temporary employee counts `0`, temporary salary history counts `0`.
+	- No temporary validation harness file remained.
+- Final checks passed:
+	- `frontend npm run build` passed.
+	- `node --check server.js` passed.
+- Next phase: UI-5 Approve Draft.
+
+## 24. Latest Phase Save State (2026-07-27)
+- PHASE 6A-M2C SALARY MANAGEMENT UI-5 PASS.
+- Implemented approve-draft UI validation only; no product code changes were required in this phase after inspection.
+- Live approval workflow validated against controlled backend instance on port `5001` using explicit backend `.env` PostgreSQL settings and a real Admin JWT signed with `JWT_SECRET`.
+- Temporary validation employees created and fully cleaned up: `86` through `93`.
+- First approval path passed:
+	- `POST /employees/:employeeId/salary-history/drafts/:draftId/approve` returned `200` with body containing only `expected_updated_at`.
+	- Same row id preserved.
+	- `record_status` changed from `DRAFT` to `PUBLISHED`.
+	- `salary_amount=6000.00`, `salary_basis=MONTHLY`, `currency_code=MYR`, `effective_from=2026-07-26`.
+	- `effective_to IS NULL`.
+	- `approved_by_user_id` matched the authenticated Admin id.
+	- `approved_at` populated.
+	- `cancelled_by_user_id` and `cancelled_at` remained NULL.
+	- `created_by_user_id` and `created_at` were preserved.
+	- No `DRAFT` row remained.
+- Future approval path passed:
+	- Initial `RM6000` salary approved, then future `RM6500` draft effective `2026-08-01` approved.
+	- Timeline became exactly contiguous: `2026-07-26 -> 2026-07-31` and `2026-08-01 -> NULL`.
+	- Both rows remained `PUBLISHED`.
+	- Old row was not retired.
+	- No overlap was introduced.
+- Salary resolution boundary verified using the resolver query shape, not `employment_details.salary_amount` fallback:
+	- `2026-07-31 -> RM6000`
+	- `2026-08-01 -> RM6500`
+- Concurrency and state validation passed:
+	- stale `expected_updated_at` -> `409`
+	- double approval -> exactly one `200`, one `409`
+	- approve after cancel -> `409`
+	- edit draft then approve with pre-edit token -> `409`
+	- same-day replacement unsafe case -> `409`
+	- backdated publication -> `409`
+- UI contract inspection confirmed:
+	- Approve action is only exposed for active `DRAFT` rows.
+	- Confirmation modal shows Current Salary, New Salary, Effective From, and Reason.
+	- Approve submit payload sends only `expected_updated_at`.
+	- Double submit is prevented while the request is in flight.
+	- `409` closes the modal and refreshes latest salary state.
+	- `403` remains a handled permission error and does not rely on logout behavior.
+	- `401` interceptor behavior in `frontend/src/services/api.js` remains unchanged.
+- Current-vs-Upcoming UI boundary verified:
+	- Current Salary remains sourced from the employment endpoint.
+	- Future `PUBLISHED` salary appears in salary history as the upcoming row.
+	- Frontend does not replace Current Salary through local date-only calculation.
+- Employee 3 invariant preserved:
+	- `RM6000.00 / MONTHLY / MYR`
+	- `effective_from=2026-07-26`, `effective_to=NULL`, `record_status=PUBLISHED`
+	- salary-history signature unchanged
+	- `employment_details.salary_amount` unchanged
+	- `company_payroll_profile.payroll_enabled=false`
+- Cleanup and final checks passed:
+	- Temporary salary-history rows deleted first, then `employment_details`, `employee_profiles`, and `employees` for temporary IDs only.
+	- Post-cleanup counts: temporary employees `0`, temporary salary history `0`.
+	- No validation harness file remained.
+	- `node --check server.js` passed.
+	- `frontend npm run build` passed.
+- Next phase: UI-6 FULL BROWSER E2E AUDIT.
+
+## 25. Latest Phase Save State (2026-07-27)
+- PHASE 6A-M2C SALARY MANAGEMENT UI-6 PASS.
+- Full browser audit completed against the live browser app using the seeded Admin login and the current backend contract.
+- Temporary employee used for browser audit: `94` (`UI6 Browser Test <timestamp>`).
+- Browser validation covered:
+	- Login and redirect to Dashboard.
+	- Employee Profile load and Salary Management rendering.
+	- Empty salary state.
+	- Create Draft flow.
+	- Edit Draft flow with optimistic concurrency.
+	- Cancel Draft flow.
+	- Approve Draft flow.
+	- Refresh and navigation durability.
+	- Current vs Upcoming salary rendering.
+	- Stale edit conflict and stale approve conflict handling.
+	- Responsive desktop, tablet, and mobile-width checks.
+	- Employment edit regression for non-salary fields.
+- Salary workflow invariants preserved during audit:
+	- Employee 3 remained `RM6000.00 / MONTHLY / MYR`, `effective_from=2026-07-26`, `effective_to=NULL`, `record_status=PUBLISHED`.
+	- `employment_details.salary_amount` for Employee 3 stayed unchanged.
+	- `company_payroll_profile.payroll_enabled` stayed `false`.
+	- Current Salary continued to come from the employment/salary-resolver contract, not client-side date selection.
+	- Browser approval payloads continued to send only `expected_updated_at`.
+- Final cleanup completed:
+	- Temporary employee `94` and all associated salary-history rows were deleted in dependency-safe order.
+	- Post-cleanup counts were `employees=0` and `employee_salary_history=0` for the temporary employee.
+- Final checks passed:
+	- `frontend npm run build` passed.
+	- `node --check server.js` passed.
+- Next phase: not started.
