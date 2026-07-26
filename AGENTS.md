@@ -190,3 +190,45 @@
 	- Existing `GET /employees/3/employment` behavior unchanged.
 	- `node --check server.js` passed.
 	- frontend `npm run build` passed.
+
+## 19. Latest Phase Save State (2026-07-26)
+- PHASE 6A-M2C-3D-2D PASS.
+- Implemented salary draft create endpoint in `backend/server.js`:
+	- `POST /employees/:id/salary-history/drafts`
+	- Middleware: `authenticateToken` + `requireRoles("Admin")`.
+- Strict forbidden-field policy implemented (HTTP 400) for server-controlled identity/lifecycle fields:
+	- `employee_id`, `record_status`, `source_type`, `created_by_user_id`, `approved_by_user_id`, `approved_at`, `cancelled_by_user_id`, `cancelled_at`, `effective_to`, `role`, `user_id`.
+- Allowed body contract enforced:
+	- `salary_amount`, `salary_basis`, `currency_code`, `effective_from`, `reason`, `source_reference`.
+	- Unexpected fields rejected with HTTP 400.
+- Validation implemented:
+	- positive integer employee id.
+	- employee existence check.
+	- `salary_amount` required, numeric, finite, and `> 0`.
+	- `salary_basis` enum: `MONTHLY`, `WEEKLY`, `DAILY`, `HOURLY`.
+	- `currency_code` strict `^[A-Z]{3}$`.
+	- `effective_from` real calendar date validation for `YYYY-MM-DD`.
+	- `reason` required non-empty trimmed string.
+	- `source_reference` optional string or null.
+- Server-assigned draft values enforced:
+	- `employee_id` from route param.
+	- `record_status='DRAFT'`.
+	- `source_type='MANUAL'`.
+	- `created_by_user_id=req.user.id`.
+	- `effective_to=NULL`, approval/cancellation metadata NULL.
+- Transaction + parameterized SQL implemented for create flow.
+- Duplicate active draft handling implemented:
+	- maps `uq_employee_salary_history_one_active_draft_per_employee` unique violation to HTTP `409` with message `Active draft already exists for this employee.`
+- Response contract implemented:
+	- HTTP `201` with `{ message: "Salary draft created", draft: {...} }`.
+	- date-only serialization preserved for `effective_from` and `effective_to`.
+- Full integration test matrix passed with temporary committed employee and guaranteed cleanup:
+	- auth/rbac tests, payload validation tests, forbidden/unexpected field tests, positive create, conflict create, history readback, salary isolation checks, employment endpoint regression, and DB invariant restoration checks.
+- Isolation guarantees verified:
+	- `resolveEmployeeSalary` behavior unchanged (employee 3 remains RM6000/MONTHLY/MYR effective 2026-07-26).
+	- `employment_details.salary_amount` unchanged.
+	- existing published salary rows unchanged.
+	- `payroll_enabled` unchanged and remains false.
+- Final checks passed:
+	- `node --check server.js` passed.
+	- frontend `npm run build` passed.

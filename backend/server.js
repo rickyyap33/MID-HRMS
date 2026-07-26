@@ -158,6 +158,58 @@ const formatDateOnly = (value) => {
 };
 
 
+const isValidDateOnlyValue = (value) => {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return false;
+  }
+
+  const [yearText, monthText, dayText] = trimmed.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return false;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year
+    && date.getUTCMonth() === (month - 1)
+    && date.getUTCDate() === day
+  );
+};
+
+
+const isStrictPositiveNumericValue = (value) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      return false;
+    }
+
+    if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(trimmed)) {
+      return false;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) && parsed > 0;
+  }
+
+  return false;
+};
+
+
 const resolveEmployeeSalary = async (employeeId, targetDate) => {
   const result = await pool.query(
     `SELECT
@@ -726,6 +778,255 @@ app.get("/employees/:id/salary-history", authenticateToken, requireRoles("Admin"
       message:"Server error"
     });
 
+  }
+});
+
+
+// Create Salary Draft (Admin only)
+app.post("/employees/:id/salary-history/drafts", authenticateToken, requireRoles("Admin"), async(req,res)=>{
+
+  const { id } = req.params;
+
+  if(!/^[1-9][0-9]*$/.test(id)){
+    return res.status(400).json({
+      message:"Invalid employee id"
+    });
+  }
+
+  if(req.body === null || typeof req.body !== "object" || Array.isArray(req.body)){
+    return res.status(400).json({
+      message:"Invalid request body"
+    });
+  }
+
+  const forbiddenFields = new Set([
+    "employee_id",
+    "record_status",
+    "source_type",
+    "created_by_user_id",
+    "approved_by_user_id",
+    "approved_at",
+    "cancelled_by_user_id",
+    "cancelled_at",
+    "effective_to",
+    "role",
+    "user_id"
+  ]);
+
+  const allowedFields = new Set([
+    "salary_amount",
+    "salary_basis",
+    "currency_code",
+    "effective_from",
+    "reason",
+    "source_reference"
+  ]);
+
+  const bodyKeys = Object.keys(req.body);
+  const forbiddenField = bodyKeys.find((key) => forbiddenFields.has(key));
+
+  if(forbiddenField){
+    return res.status(400).json({
+      message:`Forbidden field: ${forbiddenField}`
+    });
+  }
+
+  const unexpectedField = bodyKeys.find((key) => !allowedFields.has(key));
+
+  if(unexpectedField){
+    return res.status(400).json({
+      message:`Unexpected field: ${unexpectedField}`
+    });
+  }
+
+  const {
+    salary_amount,
+    salary_basis,
+    currency_code,
+    effective_from,
+    reason,
+    source_reference
+  } = req.body;
+
+  if(salary_amount === undefined || !isStrictPositiveNumericValue(salary_amount)){
+    return res.status(400).json({
+      message:"Invalid salary_amount"
+    });
+  }
+
+  if(typeof salary_basis !== "string" || !["MONTHLY", "WEEKLY", "DAILY", "HOURLY"].includes(salary_basis.trim())){
+    return res.status(400).json({
+      message:"Invalid salary_basis"
+    });
+  }
+
+  if(typeof currency_code !== "string" || !/^[A-Z]{3}$/.test(currency_code.trim())){
+    return res.status(400).json({
+      message:"Invalid currency_code"
+    });
+  }
+
+  if(!isValidDateOnlyValue(effective_from)){
+    return res.status(400).json({
+      message:"Invalid effective_from"
+    });
+  }
+
+  if(typeof reason !== "string" || reason.trim() === ""){
+    return res.status(400).json({
+      message:"Invalid reason"
+    });
+  }
+
+  if(source_reference !== undefined && source_reference !== null && typeof source_reference !== "string"){
+    return res.status(400).json({
+      message:"Invalid source_reference"
+    });
+  }
+
+  const employeeId = Number(id);
+  const createdByUserId = req.user.id;
+  const normalizedSalaryAmount = typeof salary_amount === "string" ? salary_amount.trim() : salary_amount;
+  const normalizedSalaryBasis = salary_basis.trim();
+  const normalizedCurrencyCode = currency_code.trim();
+  const normalizedEffectiveFrom = effective_from.trim();
+  const normalizedReason = reason.trim();
+  const normalizedSourceReference = source_reference === undefined ? null : source_reference;
+
+  const client = await pool.connect();
+  let transactionActive = false;
+
+  try {
+
+    await client.query("BEGIN");
+    transactionActive = true;
+
+    const employeeResult = await client.query(
+      "SELECT id FROM employees WHERE id=$1",
+      [employeeId]
+    );
+
+    if(employeeResult.rows.length === 0){
+      await client.query("ROLLBACK");
+      transactionActive = false;
+
+      return res.status(404).json({
+        message:"Employee not found"
+      });
+    }
+
+    const insertResult = await client.query(
+      `INSERT INTO employee_salary_history (
+          employee_id,
+          salary_amount,
+          salary_basis,
+          currency_code,
+          effective_from,
+          effective_to,
+          record_status,
+          reason,
+          source_type,
+          source_reference,
+          created_by_user_id,
+          approved_by_user_id,
+          approved_at,
+          cancelled_by_user_id,
+          cancelled_at
+        ) VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          NULL,
+          'DRAFT',
+          $6,
+          'MANUAL',
+          $7,
+          $8,
+          NULL,
+          NULL,
+          NULL,
+          NULL
+        )
+        RETURNING id,
+                  employee_id,
+                  salary_amount,
+                  salary_basis,
+                  currency_code,
+                  effective_from,
+                  effective_to,
+                  record_status,
+                  reason,
+                  source_type,
+                  source_reference,
+                  created_by_user_id,
+                  approved_by_user_id,
+                  approved_at,
+                  cancelled_by_user_id,
+                  cancelled_at,
+                  created_at,
+                  updated_at`,
+      [
+        employeeId,
+        normalizedSalaryAmount,
+        normalizedSalaryBasis,
+        normalizedCurrencyCode,
+        normalizedEffectiveFrom,
+        normalizedReason,
+        normalizedSourceReference,
+        createdByUserId
+      ]
+    );
+
+    await client.query("COMMIT");
+    transactionActive = false;
+
+    const draft = insertResult.rows[0];
+
+    return res.status(201).json({
+      message:"Salary draft created",
+      draft:{
+        ...draft,
+        effective_from: formatDateOnly(draft.effective_from),
+        effective_to: formatDateOnly(draft.effective_to)
+      }
+    });
+
+  } catch(error){
+
+    if(transactionActive){
+      try {
+        await client.query("ROLLBACK");
+      } catch (_) {}
+    }
+
+    if(error.code === "23505" && error.constraint === "uq_employee_salary_history_one_active_draft_per_employee"){
+      return res.status(409).json({
+        message:"Active draft already exists for this employee."
+      });
+    }
+
+    if(error.code === "23514"){
+      return res.status(400).json({
+        message:"Invalid salary draft payload"
+      });
+    }
+
+    if(error.code === "23503" && error.constraint === "employee_salary_history_employee_id_fkey"){
+      return res.status(404).json({
+        message:"Employee not found"
+      });
+    }
+
+    console.log(error);
+
+    return res.status(500).json({
+      message:"Server error"
+    });
+
+  } finally {
+    client.release();
   }
 });
 
