@@ -385,6 +385,8 @@ const requireRoles = (...allowedRoles) => {
   };
 };
 
+const requireAdminAccess = [authenticateToken, requireRoles("Admin")];
+
 
 // Test API
 app.get("/", (req,res)=>{
@@ -394,7 +396,7 @@ app.get("/", (req,res)=>{
 });
 
 // Get Employees
-app.get("/employees", async(req,res)=>{
+app.get("/employees", ...requireAdminAccess, async(req,res)=>{
     const result = await pool.query(
         "SELECT * FROM employees ORDER BY id DESC"
     );
@@ -404,7 +406,7 @@ app.get("/employees", async(req,res)=>{
 
 
 // Create Employee
-app.post("/employees", async(req,res)=>{
+app.post("/employees", ...requireAdminAccess, async(req,res)=>{
 
     const {
         name,
@@ -433,7 +435,7 @@ app.post("/employees", async(req,res)=>{
 
 
 // Update Employee
-app.put("/employees/:id", async(req,res)=>{
+app.put("/employees/:id", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -486,7 +488,7 @@ app.put("/employees/:id", async(req,res)=>{
 
 
 // Delete Employee
-app.delete("/employees/:id", async(req,res)=>{
+app.delete("/employees/:id", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -522,7 +524,7 @@ app.delete("/employees/:id", async(req,res)=>{
 
 
 // Get Employee Profile
-app.get("/employees/:id/profile", async(req,res)=>{
+app.get("/employees/:id/profile", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -556,7 +558,7 @@ app.get("/employees/:id/profile", async(req,res)=>{
 
 
 // Create Employee Profile
-app.post("/employees/:id/profile", async(req,res)=>{
+app.post("/employees/:id/profile", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -615,7 +617,7 @@ app.post("/employees/:id/profile", async(req,res)=>{
 
 
 // Update Employee Profile
-app.put("/employees/:id/profile", async(req,res)=>{
+app.put("/employees/:id/profile", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2134,7 +2136,7 @@ app.put("/employees/:id/employment", authenticateToken, requireRoles("Admin"), a
 
 
 // Get Employee Documents
-app.get("/employees/:id/documents", async(req,res)=>{
+app.get("/employees/:id/documents", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2161,7 +2163,7 @@ app.get("/employees/:id/documents", async(req,res)=>{
 
 
 // View Employee Document
-app.get("/documents/:id/view", async(req,res)=>{
+app.get("/documents/:id/view", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2212,7 +2214,7 @@ app.get("/documents/:id/view", async(req,res)=>{
 
 
 // Download Employee Document
-app.get("/documents/:id/download", async(req,res)=>{
+app.get("/documents/:id/download", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2263,7 +2265,7 @@ app.get("/documents/:id/download", async(req,res)=>{
 
 
 // Create Employee Document Metadata
-app.post("/employees/:id/documents", (req,res)=>{
+app.post("/employees/:id/documents", ...requireAdminAccess, (req,res)=>{
 
   upload.single("file")(req,res, async(error)=>{
 
@@ -2361,7 +2363,7 @@ app.post("/employees/:id/documents", (req,res)=>{
 
 
 // Delete Employee Document
-app.delete("/documents/:id", async(req,res)=>{
+app.delete("/documents/:id", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2398,7 +2400,7 @@ app.delete("/documents/:id", async(req,res)=>{
 
 
 // Get All Attendance Records
-app.get("/attendance", async(req,res)=>{
+app.get("/attendance", ...requireAdminAccess, async(req,res)=>{
 
   try {
 
@@ -2424,7 +2426,7 @@ app.get("/attendance", async(req,res)=>{
 
 
 // Get Attendance Records For One Employee
-app.get("/employees/:id/attendance", async(req,res)=>{
+app.get("/employees/:id/attendance", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2467,7 +2469,7 @@ app.get("/employees/:id/attendance", async(req,res)=>{
 
 
 // Add Attendance Record
-app.post("/employees/:id/attendance", async(req,res)=>{
+app.post("/employees/:id/attendance", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2516,7 +2518,7 @@ app.post("/employees/:id/attendance", async(req,res)=>{
 
 
 // Update Attendance Record
-app.put("/attendance/:id", async(req,res)=>{
+app.put("/attendance/:id", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2568,7 +2570,7 @@ app.put("/attendance/:id", async(req,res)=>{
 
 
 // Delete Attendance Record
-app.delete("/attendance/:id", async(req,res)=>{
+app.delete("/attendance/:id", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2605,7 +2607,7 @@ app.delete("/attendance/:id", async(req,res)=>{
 
 
 // Get Leave Types
-app.get("/leave-types", async(req,res)=>{
+app.get("/leave-types", ...requireAdminAccess, async(req,res)=>{
 
   try {
 
@@ -2631,7 +2633,7 @@ app.get("/leave-types", async(req,res)=>{
 
 
 // Get All Leave Requests
-app.get("/leave-requests", async(req,res)=>{
+app.get("/leave-requests", ...requireAdminAccess, async(req,res)=>{
 
   try {
 
@@ -2659,7 +2661,7 @@ app.get("/leave-requests", async(req,res)=>{
 
 
 // Create Leave Request
-app.post("/employees/:id/leave-request", async(req,res)=>{
+app.post("/employees/:id/leave-request", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2707,7 +2709,7 @@ app.post("/employees/:id/leave-request", async(req,res)=>{
 
 
 // Approve Leave Request
-app.put("/leave-requests/:id/approve", async(req,res)=>{
+app.put("/leave-requests/:id/approve", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2756,7 +2758,7 @@ app.put("/leave-requests/:id/approve", async(req,res)=>{
 
 
 // Reject Leave Request
-app.put("/leave-requests/:id/reject", async(req,res)=>{
+app.put("/leave-requests/:id/reject", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2805,7 +2807,7 @@ app.put("/leave-requests/:id/reject", async(req,res)=>{
 
 
 // Get Leave Balance For One Employee
-app.get("/employees/:id/leave-balance", async(req,res)=>{
+app.get("/employees/:id/leave-balance", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 
@@ -2879,7 +2881,7 @@ app.get("/employees/:id/leave-balance", async(req,res)=>{
 
 
 // Get All Leave History
-app.get("/leave-history", async(req,res)=>{
+app.get("/leave-history", ...requireAdminAccess, async(req,res)=>{
 
   try {
 
@@ -2920,7 +2922,7 @@ app.get("/leave-history", async(req,res)=>{
 
 
 // Get Leave History For One Employee
-app.get("/employees/:id/leave-history", async(req,res)=>{
+app.get("/employees/:id/leave-history", ...requireAdminAccess, async(req,res)=>{
 
   const { id } = req.params;
 

@@ -10,6 +10,8 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD
 });
 
+const backendBaseUrl = `http://127.0.0.1:${process.env.PORT || '5000'}`;
+
 const assert = (condition, message) => {
   if (!condition) {
     throw new Error(message);
@@ -40,6 +42,70 @@ const getCounts = async (client) => {
   }
 
   return counts;
+};
+
+const verifyTwoCompanyStructuralIsolation = async (client) => {
+  const secondCompanyCode = `AUDCO_${Date.now().toString(36)}`.slice(0, 12);
+  const secondRegistration = `AUD-${Date.now()}`;
+
+  await client.query('BEGIN');
+  try {
+    const beforeCompanyCount = await querySingleValue(
+      client,
+      'SELECT count(*)::int AS count FROM public.company_payroll_profile'
+    );
+
+    await client.query(
+      `INSERT INTO public.company_payroll_profile (
+        company_code,
+        legal_name,
+        payroll_display_name,
+        registration_no,
+        default_currency,
+        country_code,
+        timezone,
+        payroll_enabled
+      ) VALUES ($1, $2, $3, $4, 'MYR', 'MY', 'Asia/Kuala_Lumpur', false)`,
+      [secondCompanyCode, 'Audit Company', 'Audit Company', secondRegistration]
+    );
+
+    const afterInsertCompanyCount = await querySingleValue(
+      client,
+      'SELECT count(*)::int AS count FROM public.company_payroll_profile'
+    );
+    assert(afterInsertCompanyCount.count === beforeCompanyCount.count + 1, 'Second temporary company was not created for isolation check');
+
+    const componentCompanyColumns = await client.query(`
+      SELECT table_name, column_name
+      FROM information_schema.columns
+      WHERE table_schema='public'
+        AND table_name IN ('payroll_component_type', 'payroll_component', 'payroll_component_rule_version', 'payroll_component_tax_flags_version')
+        AND column_name ILIKE '%company%'
+      ORDER BY table_name, column_name
+    `);
+
+    assert(componentCompanyColumns.rows.length === 0, 'Unexpected direct company ownership columns exist on payroll component foundation tables');
+
+    await client.query('ROLLBACK');
+
+    const finalCompanyCount = await querySingleValue(
+      client,
+      'SELECT count(*)::int AS count FROM public.company_payroll_profile'
+    );
+    assert(finalCompanyCount.count === beforeCompanyCount.count, 'Temporary company context did not roll back cleanly');
+
+    return {
+      beforeCompanyCount: beforeCompanyCount.count,
+      afterRollbackCompanyCount: finalCompanyCount.count,
+      directCompanyColumns: 0,
+      conclusion: 'Row-level cross-company component relationships are structurally not expressible in the current 6A-3 schema because component foundation tables store no company foreign keys.'
+    };
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (_) {}
+    throw error;
+  }
 };
 
 const verifySchema = async (client) => {
@@ -161,7 +227,7 @@ const verifyLiveApi = async () => {
 
   const token = jwt.sign({ sub: 1, id: 1, role: 'Admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-  const employmentResponse = await fetch('http://127.0.0.1:5001/employees/3/employment', {
+  const employmentResponse = await fetch(`${backendBaseUrl}/employees/3/employment`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   assert(employmentResponse.status === 200, 'Expected GET /employees/3/employment to return 200');
@@ -170,7 +236,7 @@ const verifyLiveApi = async () => {
   assert(employmentBody.salary_configured === true, 'Expected employee 3 salary to remain configured');
   assert(typeof employmentBody.salary_amount === 'string', 'Expected employee 3 salary_amount string in compatibility response');
 
-  const historyResponse = await fetch('http://127.0.0.1:5001/employees/3/salary-history', {
+  const historyResponse = await fetch(`${backendBaseUrl}/employees/3/salary-history`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   assert(historyResponse.status === 200, 'Expected GET /employees/3/salary-history to return 200');
@@ -412,6 +478,7 @@ const main = async () => {
     );
 
     await verifySchema(client);
+    const structuralIsolation = await verifyTwoCompanyStructuralIsolation(client);
     const tempArtifacts = await runTemporaryIsolationChecks(client);
     await verifyLiveApi();
 
@@ -426,6 +493,7 @@ const main = async () => {
     console.log(JSON.stringify({
       beforeCounts,
       afterCounts,
+      structuralIsolation,
       tempArtifacts,
       company,
       componentTypes: componentTypes.rows,

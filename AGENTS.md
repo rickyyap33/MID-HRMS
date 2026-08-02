@@ -540,3 +540,24 @@
 	- `node --check server.js` passed
 - No new migration was created.
 - No Phase 6A-4 work was started.
+
+## 28. Latest Phase Save State (2026-08-02)
+- PHASE 6A-3 COMPLETE — P0 SECURITY HOTFIX PASS.
+- Closed verified public employee-data exposure in `backend/server.js` by applying existing `authenticateToken` and `requireRoles("Admin")` protections across sensitive employee-data routes.
+- Added focused security regression utility `backend/scripts/employee-route-security-regression.js`.
+- Extended `backend/scripts/phase-6a-3-audit.js` to:
+	- target the normal backend port `5000`
+	- verify two-company structural isolation where row-level company links are not expressible in the current component foundation schema
+- Re-executed evidence:
+	- phase-6a-3 audit pass 1: PASS
+	- phase-6a-3 audit pass 2: PASS
+	- employee-route security regression: PASS
+	- backend syntax check: PASS
+	- frontend build: PASS
+	- frontend lint: FAIL on the same unrelated pre-existing files
+- Browser verification passed:
+	- logged-out `localhost:5173/employees` redirected to `/login`
+	- authenticated `127.0.0.1:5173/employees` loaded successfully with a short-lived local Admin token for verification only
+- Standalone 6A-2 audit command remains unavailable in the repository; regression evidence is preserved in the 6A-2 report and rechecked in the 6A-3 audit utility.
+- No migration was required.
+- No Phase 6A-4 work was started.

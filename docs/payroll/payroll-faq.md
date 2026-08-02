@@ -204,6 +204,7 @@ What must future assistants understand about payroll component foundation and ow
 | Verification can legitimately result in a no-op when the live schema already satisfies the requirement. |  |
 | Phase completion requires executed evidence, not inspection alone. |  |
 | Payroll Component Foundation must preserve history and reject orphan or cross-company records. |  |
+| Sensitive employee-data routes must not be public in normal runtime configuration. | Treating development mode as permission to expose employee or salary data without authentication. |
 
 Why:
 The live schema already contained the payroll component foundation tables, and the corrected 6A-3 audit proved they were safe without a migration.
