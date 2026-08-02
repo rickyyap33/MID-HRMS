@@ -521,3 +521,22 @@
 - No migration was required.
 - No product frontend change was required for Phase 6A-3.
 - Next formal section: 6A-4, not started.
+
+## 27. Latest Phase Save State (2026-08-02)
+- PHASE 6A-3 COMPLETE — ACCEPTANCE CORRECTION.
+- Corrected the formal roadmap in `docs/payroll/phase-6a-master-roadmap.md` to the owner-restored numbering source.
+- Corrected `docs/payroll/phase-6a-3-payroll-component-foundation-report.md` to the formal `6A-3A → 6A-3G` structure.
+- Corrected the Phase 6A-3 training section in `docs/payroll/payroll-faq.md` to map the executed evidence to the formal sub-item numbering.
+- Preserved the existing repeatable audit utility `backend/scripts/phase-6a-3-audit.js` and its executed evidence.
+- Live verification remained unchanged:
+	- backend on `5000` reused
+	- frontend on `5173` reused
+	- live PostgreSQL catalogue verified
+	- phase-6a-3 audit passed twice
+- Corrected verification baseline recorded:
+	- standalone 6A-2 audit command is not available in the repository
+	- `npm run lint` still fails on the same unrelated pre-existing files
+	- `npm run build` passed
+	- `node --check server.js` passed
+- No new migration was created.
+- No Phase 6A-4 work was started.

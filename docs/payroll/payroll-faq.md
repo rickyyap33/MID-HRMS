@@ -192,14 +192,21 @@ What must future assistants understand about payroll component foundation and ow
 
 | Correct | Incorrect |
 |---|---|
-| The restored roadmap is the formal Phase 6A numbering source, and `6A-3` means Payroll Component Foundation. | Treating `M1`, `M2`, or `M2C` as formal roadmap sections. |
-| Child rule and tax versions inherit valid ownership through their component parent when no direct ownership column is stored. | Treating Salary Draft Cancel as Phase 6A-3. |
-| Verification can legitimately result in a no-op when the live schema already satisfies the requirement. | Creating unnecessary migrations, APIs, UI, or seed data just to make a batch look active. |
-| Phase completion requires executed evidence, not inspection alone. | Claiming a live audit passed without running it. |
-| Payroll Component Foundation must preserve history and reject orphan or cross-company records. | Allowing ownerless or cross-company component records. |
+| The restored roadmap is the formal Phase 6A numbering source, and `6A-3` means Payroll Component Foundation. | Treating `M1`, `M2`, `M2C`, or other temporary labels as formal roadmap sections. |
+| `6A-3A` is Payroll Component Master. | Treating Salary Draft Cancel as Phase 6A-3. |
+| `6A-3B` is Payroll Component Rule Versioning. | Creating unnecessary migrations, APIs, UI, or seed data just to make a batch look active. |
+| `6A-3C` is Payroll Component Tax/Statutory Flags Versioning. | Allowing ownerless or cross-company component records. |
+| `6A-3D` is Effective-Date Overlap Protection. | Claiming inspection alone is a passed live audit. |
+| `6A-3E` is Calculation-Method Integrity. | Starting employee assignment, Salary History, UI, or Payroll Run work in this batch. |
+| `6A-3F` is Component Lifecycle. |  |
+| `6A-3G` is Foundation QA. |  |
+| Child rule and tax versions inherit valid ownership through their component parent when no direct ownership column is stored. |  |
+| Verification can legitimately result in a no-op when the live schema already satisfies the requirement. |  |
+| Phase completion requires executed evidence, not inspection alone. |  |
+| Payroll Component Foundation must preserve history and reject orphan or cross-company records. |  |
 
 Why:
-The live schema already contained the payroll component foundation tables, and the 6A-3 audit proved they were safe without a migration.
+The live schema already contained the payroll component foundation tables, and the corrected 6A-3 audit proved they were safe without a migration.
 
 Source or evidence:
 - [docs/payroll/phase-6a-master-roadmap.md](phase-6a-master-roadmap.md)
@@ -210,6 +217,31 @@ Source or evidence:
 
 Future AI instruction:
 Use live PostgreSQL catalogue evidence and repeatable rollback audits before proposing any payroll-component ownership rewrite.
+
+### 6A-3A through 6A-3G - Formal mapping
+
+Question:
+How should the formal 6A-3 roadmap items be interpreted?
+
+| Correct | Incorrect |
+|---|---|
+| `6A-3A` = Payroll Component Master | Using the compressed `6A-3A → 6A-3E` recovery labels as formal roadmap IDs |
+| `6A-3B` = Payroll Component Rule Versioning | Treating `M1`, `M2`, or `M2C` as roadmap sections |
+| `6A-3C` = Payroll Component Tax/Statutory Flags Versioning | Reopening Salary Draft Cancel in this batch |
+| `6A-3D` = Effective-Date Overlap Protection | Adding unneeded seed data or UI just to show activity |
+| `6A-3E` = Calculation-Method Integrity | Claiming the audit passed without running it |
+| `6A-3F` = Component Lifecycle | Starting 6A-4 work |
+| `6A-3G` = Foundation QA |  |
+
+Why:
+The owner-restored roadmap is the formal numbering source, and the corrected report maps the executed evidence to these seven sub-items.
+
+Source or evidence:
+- [docs/payroll/phase-6a-master-roadmap.md](phase-6a-master-roadmap.md)
+- [docs/payroll/phase-6a-3-payroll-component-foundation-report.md](phase-6a-3-payroll-component-foundation-report.md)
+
+Future AI instruction:
+Always use the formal 6A-3A through 6A-3G numbering when summarizing Payroll Component Foundation.
 
 ## Accepted Temporary Risks - Not Current Blockers
 

@@ -32,9 +32,21 @@
 - [docs/payroll/phase-6a-architecture-approval-freeze.md](phase-6a-architecture-approval-freeze.md) preserves the frozen 6A-1 approval and freeze record.
 - [docs/payroll/phase-6a-2-company-payroll-foundation-report.md](phase-6a-2-company-payroll-foundation-report.md) records the completed 6A-2 foundation batch and its verified no-op ownership decision.
 - [docs/payroll/phase-6a-3-payroll-component-foundation-report.md](phase-6a-3-payroll-component-foundation-report.md) records the completed 6A-3 foundation batch and its live audit evidence.
-- [docs/payroll/payroll-faq.md](payroll-faq.md) records training rules and owner guidance for Phase 6A-1 and Phase 6A-2.
+- [docs/payroll/payroll-faq.md](payroll-faq.md) records training rules and owner guidance for Phase 6A-1 through Phase 6A-3.
 
-## 4. Roadmap Interpretation Rules
+## 4. Formal 6A-3 Scope
+
+| Formal ID | Official Scope | Status |
+|---|---|---|
+| 6A-3A | Payroll Component Master | COMPLETE |
+| 6A-3B | Payroll Component Rule Versioning | COMPLETE |
+| 6A-3C | Payroll Component Tax/Statutory Flags Versioning | COMPLETE |
+| 6A-3D | Effective-Date Overlap Protection | COMPLETE |
+| 6A-3E | Calculation-Method Integrity | COMPLETE |
+| 6A-3F | Component Lifecycle | COMPLETE |
+| 6A-3G | Foundation QA | COMPLETE |
+
+## 5. Roadmap Interpretation Rules
 
 - Formal roadmap IDs are the authoritative Phase 6A numbering source.
 - Temporary migration labels such as `M1`, `M2`, `M2B`, `M2C`, `M2C-3D`, and similar batch names are implementation labels only.
@@ -44,7 +56,7 @@
 - `6A-3` is complete.
 - `6A-4` and later are not started.
 
-## 5. Freeze Preservation
+## 6. Freeze Preservation
 
 This document is an index and recovery record only.
 
@@ -54,7 +66,7 @@ It does not:
 - Authorize Phase 6A-4 or later work
 - Change salary workflow decisions already recorded elsewhere
 
-## 6. Notes For Future Review
+## 7. Notes For Future Review
 
 - The repository initially lacked a persisted master roadmap, so this file restores the owner-approved numbering source without rewriting historical evidence.
 - Any future Phase 6A batch must be reconciled against this roadmap before implementation.
