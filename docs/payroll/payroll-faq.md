@@ -163,6 +163,54 @@ Source or evidence:
 Future AI instruction:
 Do not treat frozen architecture approval as proof of executed test completion.
 
+### 6A-2 - Company payroll foundation
+
+Question:
+Do payroll component tables require a company-scoping migration or backfill in the current live workspace?
+
+| Correct | Incorrect |
+|---|---|
+| Check the live schema and data first. In the current workspace, `company_payroll_profile` is present, `employee_payroll_profile` is still empty, payroll component tables are still empty, and no company-scoped component columns exist, so no company-ownership migration was required. | Adding company-scoping columns or a backfill just because the table names sound payroll-owned. |
+| Treat 6A-2C as a verified no-op when the live database already matches the approved foundation state. | Claiming a migration was needed without live schema evidence. |
+
+Why:
+The repeatable 6A-2E audit confirmed the company payroll foundation is present and stable without any component ownership rewrite.
+
+Source or evidence:
+- [docs/payroll/phase-6a-2-company-payroll-foundation-report.md](phase-6a-2-company-payroll-foundation-report.md)
+- [backend/migrations/20260726_phase6a_m1_payroll_foundation.sql](../../backend/migrations/20260726_phase6a_m1_payroll_foundation.sql)
+- [backend/migrations/20260726_phase6a_m2b_employee_payroll_profile.sql](../../backend/migrations/20260726_phase6a_m2b_employee_payroll_profile.sql)
+- [backend/migrations/20260726_phase6a_m2c2a_company_payroll_bootstrap.sql](../../backend/migrations/20260726_phase6a_m2c2a_company_payroll_bootstrap.sql)
+
+Future AI instruction:
+Use live counts and schema columns before recommending any payroll-component ownership backfill.
+
+### 6A-3 - Payroll component foundation
+
+Question:
+What must future assistants understand about payroll component foundation and ownership in Phase 6A-3?
+
+| Correct | Incorrect |
+|---|---|
+| The restored roadmap is the formal Phase 6A numbering source, and `6A-3` means Payroll Component Foundation. | Treating `M1`, `M2`, or `M2C` as formal roadmap sections. |
+| Child rule and tax versions inherit valid ownership through their component parent when no direct ownership column is stored. | Treating Salary Draft Cancel as Phase 6A-3. |
+| Verification can legitimately result in a no-op when the live schema already satisfies the requirement. | Creating unnecessary migrations, APIs, UI, or seed data just to make a batch look active. |
+| Phase completion requires executed evidence, not inspection alone. | Claiming a live audit passed without running it. |
+| Payroll Component Foundation must preserve history and reject orphan or cross-company records. | Allowing ownerless or cross-company component records. |
+
+Why:
+The live schema already contained the payroll component foundation tables, and the 6A-3 audit proved they were safe without a migration.
+
+Source or evidence:
+- [docs/payroll/phase-6a-master-roadmap.md](phase-6a-master-roadmap.md)
+- [docs/payroll/phase-6a-3-payroll-component-foundation-report.md](phase-6a-3-payroll-component-foundation-report.md)
+- [backend/scripts/phase-6a-3-audit.js](../../backend/scripts/phase-6a-3-audit.js)
+- [backend/migrations/20260726_phase6a_m1_payroll_foundation.sql](../../backend/migrations/20260726_phase6a_m1_payroll_foundation.sql)
+- [backend/migrations/20260726_phase6a_m2c2a_company_payroll_bootstrap.sql](../../backend/migrations/20260726_phase6a_m2c2a_company_payroll_bootstrap.sql)
+
+Future AI instruction:
+Use live PostgreSQL catalogue evidence and repeatable rollback audits before proposing any payroll-component ownership rewrite.
+
 ## Accepted Temporary Risks - Not Current Blockers
 
 Accepted temporary risk does not mean already fixed.

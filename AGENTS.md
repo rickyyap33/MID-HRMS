@@ -492,3 +492,32 @@
 	- `frontend npm run build` passed.
 	- `node --check server.js` passed.
 - Next phase: not started.
+
+## 26. Latest Phase Save State (2026-08-02)
+- PHASE 6A-3 COMPLETE.
+- Owner-restored master roadmap persisted in `docs/payroll/phase-6a-master-roadmap.md`.
+- Added repeatable audit utility `backend/scripts/phase-6a-3-audit.js`.
+- Added final report `docs/payroll/phase-6a-3-payroll-component-foundation-report.md`.
+- Added Phase 6A-3 training section to `docs/payroll/payroll-faq.md`.
+- Live verification completed against the running backend on port 5001, the frontend on port 5173, and the local PostgreSQL database.
+- Live catalogue and rollback checks passed twice with temporary transaction-scoped payroll component records.
+- Live counts remained stable before and after each audit:
+	- `company_payroll_profile=1`
+	- `payroll_component_type=3`
+	- `payroll_component=0`
+	- `payroll_component_rule_version=0`
+	- `payroll_component_tax_flags_version=0`
+- Frontend build passed.
+- Backend syntax check passed.
+- Frontend lint still fails on the same unrelated pre-existing files:
+	- `App.jsx`
+	- `SalaryDraftModal.jsx`
+	- `SalaryManagementSection.jsx`
+	- `Attendance.jsx`
+	- `EmployeeProfile.jsx`
+	- `Employees.jsx`
+	- `Leave.jsx`
+	- `api.js`
+- No migration was required.
+- No product frontend change was required for Phase 6A-3.
+- Next formal section: 6A-4, not started.
